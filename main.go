@@ -36,9 +36,7 @@ func startCli() {
 				{
 					fmt.Println("Exiting application...")
 					resp, err := http.Get("http://127.0.0.1:8080/api/stop")
-					if err != nil {
-						fmt.Println("Error closing server", err)
-					} else {
+					if err == nil {
 						resp.Body.Close()
 					}
 					os.Exit(0)
@@ -60,9 +58,11 @@ func startCli() {
 						continue
 					}
 					defer conn.Close()
-					_, err = conn.Execute(command)
+					resp, err := conn.Execute(command)
 					if err != nil {
 						fmt.Println("failed to send the order", err)
+					} else {
+						fmt.Println(resp)
 					}
 				}
 			}
