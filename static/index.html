@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>MC 服务器日志</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; background-color: #f0f0f0; }
+        #log-container {
+            background-color: #fff;
+            color: #333;
+            padding: 1rem;
+            border-radius: 8px;
+            height: 700px;
+            overflow-y: scroll;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        button { padding: 0.5rem 1rem; font-size: 1rem; margin-top: 1rem; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Minecraft 服务器日志</h1>
+    <button onclick="startServer()">启动服务器</button>
+    <button onclick="stopServer()">停止服务器</button>
+    <button onclick="fetchLog()">查询日志</button>
+    <div id="log-container"></div>
+
+    <script>
+        const logContainer = document.getElementById('log-container');
+        let pollingInterval;
+
+        // 启动服务器的函数
+        async function startServer() {
+            try {
+                const response = await fetch('/api/start');
+                const text = await response.text();
+                logContainer.textContent = text;
+                // 启动服务器后，开始轮询日志
+                startPolling();
+            } catch (error) {
+                logContainer.textContent = '无法启动服务器：' + error;
+            }
+        }
+
+        // 停止服务器的函数
+        async function stopServer() {
+            stopPolling(); // 停止日志刷新
+            try {
+                const response = await fetch('/api/stop');
+                const text = await response.text();
+                logContainer.textContent = text;
+            } catch (error) {
+                logContainer.textContent = '无法停止服务器：' + error;
+            }
+        }
+
+        // 停止轮询日志的函数
+        function stopPolling() {
+            clearInterval(pollingInterval);
+            console.log("日志轮询已停止。");
+        }
+
+        // 开始轮询日志的函数
+        function startPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+            pollingInterval = setInterval(fetchLog, 3000);
+        }
+
+        // 获取日志并更新页面的函数
+        async function fetchLog() {
+            try {
+                const response = await fetch('/api/log');
+                const text = await response.text();
+                logContainer.textContent = text; 
+                logContainer.scrollTop = logContainer.scrollHeight;
+            } catch (error) {
+                console.error("获取日志失败:", error);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/exec"
+	"sync"
+	//"time"
+
+	"github.com/gorcon/rcon"
+)
+
+var (
+	mcServerCmd *exec.Cmd  // 存储服务器进程的命令对象
+	mu          sync.Mutex // 保护共享变量的锁
+)
+
+// RCON配置
+const (
+	RCON_HOST     = "0.0.0.0:25575"
+	RCON_PASSWORD = "1234abcd" // 替换为你的 RCON 密码
+)
+
+// handleStart 函数，处理启动服务器的请求
+func handleStart(w http.ResponseWriter, r *http.Request) {
+	// 你的启动服务器逻辑
+	// 例如：通过 os/exec.Command 启动一个进程
+	cmd := exec.Command("/bin/bash", "/home/liuziming/server.sh")
+
+	// 启动一个 goroutine 来等待命令结束并清理
+	go func(cmd *exec.Cmd) {
+		log.Printf("Minecraft server process (PID: %d) has started...", cmd.Process.Pid)
+		// Wait() 会阻塞，直到命令执行完毕
+		cmd.Wait()
+		log.Println("Minecraft server process has stopped.")
+		mu.Lock()
+		mcServerCmd = nil
+		mu.Unlock()
+	}(cmd)
+
+	mcServerCmd = cmd
+	w.Write([]byte("Minecraft server start command sent."))
+}
+
+// handleStop 函数，处理停止服务器的请求
+func handleStop(w http.ResponseWriter, r *http.Request) {
+	conn, err := rcon.Dial(RCON_HOST, RCON_PASSWORD)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("无法连接到 RCON 服务器：%v", err), http.StatusInternalServerError)
+		log.Printf("RCON 连接错误：%v", err)
+		return
+	}
+	defer conn.Close()
+
+	// 发送 "stop" 命令
+	response, err := conn.Execute("stop")
+	if err != nil {
+		http.Error(w, fmt.Sprintf("发送命令失败：%v", err), http.StatusInternalServerError)
+		log.Printf("RCON 命令错误：%v", err)
+		return
+	}
+
+	fmt.Fprintf(w, "命令 'stop' 已发送。\n服务器响应：\n%s", response)
+}
+
+func handleWrite(w http.ResponseWriter, r *http.Request) {
+	filename := "/home/liuziming/server/logs/latest.log"
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		fmt.Println("filed to read")
+		http.Error(w, "unable to read", http.StatusInternalServerError)
+		return
+	}
+	_, err = w.Write(data)
+	if err != nil {
+		fmt.Println("Failed to write")
+	}
+}
+
+func main() {
+	http.Handle("/", http.FileServer(http.Dir("./static")))
+
+	// 添加新的路由
+	http.HandleFunc("/api/start", handleStart)
+	http.HandleFunc("/api/stop", handleStop)
+	//http.HandleFunc("/api/log", handleWrite)
+	// 保留旧的路由
+	//http.HandleFunc("/api/say", handleSayWithRcon)
+
+	log.Println("Starting server on :8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
