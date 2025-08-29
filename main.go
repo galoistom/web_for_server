@@ -35,9 +35,17 @@ func startCli() {
 			case "exit":
 				{
 					fmt.Println("Exiting application...")
-					resp, err := http.Get("http://127.0.0.1:8080/api/stop")
-					if err == nil {
-						resp.Body.Close()
+					//resp, err := http.Get("http://127.0.0.1:8080/api/stop")
+					//if err == nil {
+					//	resp.Body.Close()
+					//}
+					if mcServerCmd != nil {
+						resp, err := http.Get("http://127.0.0.1:8080/api/stop")
+						if err != nil {
+							fmt.Println("unable to connect to server", err)
+						} else {
+							resp.Body.Close()
+						}
 					}
 					os.Exit(0)
 				} // 安全退出程序
@@ -82,7 +90,7 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 
 	// 启动 Minecraft 服务器进程
 
-	cmd := exec.Command("/bin/bash", "/home/liuziming/server.sh")
+	cmd := exec.Command("/bin/bash", "./server.sh")
 
 	// 启动进程
 	err := cmd.Start()
