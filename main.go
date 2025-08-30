@@ -63,6 +63,10 @@ func startCli() {
 				}
 			default:
 				{
+					if !checkStarted() {
+						fmt.Println("the server is not started yet")
+						continue
+					}
 					conn, err := rcon.Dial(RCON_HOST, RCON_PASSWORD)
 					if err != nil {
 						fmt.Println("Unable to connect to server", err)
@@ -160,6 +164,41 @@ func handleWrite(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleCommand 处理来自网页端的命令请求
+func handleCommand(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 从 URL 查询参数中获取 "command"
+	command := r.URL.Query().Get("command")
+	if command == "" {
+		http.Error(w, "Command is empty", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Received command from web: %s", command)
+
+	if !checkStarted() {
+		fmt.Println("the server is not started yet")
+		return
+	}
+	conn, err := rcon.Dial(RCON_HOST, RCON_PASSWORD)
+	if err != nil {
+		fmt.Println("Unable to connect to server", err)
+		return
+	}
+	defer conn.Close()
+	resp, err := conn.Execute(command)
+	if err != nil {
+		fmt.Println("failed to send the order", err)
+	} else {
+		fmt.Println(resp)
+	}
+
+}
+
 func main() {
 	startCli()
 	http.Handle("/", http.FileServer(http.Dir("./static")))
@@ -168,6 +207,7 @@ func main() {
 	http.HandleFunc("/api/stop", handleStop)
 	http.HandleFunc("/api/log", handleWrite)
 	http.HandleFunc("/api/checkstart", handlecheckStart)
+	http.HandleFunc("/api/command", handleCommand)
 
 	log.Println("Starting server on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
