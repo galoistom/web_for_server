@@ -1,5 +1,12 @@
 body { font-family: sans-serif; margin: 2rem; background-color: #f0f0f0; }
 
+#button-container {
+    display: flex;
+    justify-content: left; /* 水平居中 */
+    gap: 10px; /* 在按钮之间添加间距 */
+    margin-top: 20px; /* 顶部外边距 */
+}
+
 #status-container {
 	position: fixed;
 	top: 10px;

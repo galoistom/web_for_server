@@ -8,9 +8,11 @@
 <body>
 	<div id="status-container">unknown</div>
 	<h1>Minecraft 服务器日志</h1>
-	<button onclick="startServer()">启动服务器</button>
-	<button onclick="stopServer()">停止服务器</button>
-	<button onclick="refresh()">刷新</button>
+	<div id="button-container">
+		<button onclick="startServer()">启动服务器</button>
+		<button onclick="stopServer()">停止服务器</button>
+		<button onclick="refresh()">刷新</button>
+	</div>
 	<div id="log-container"></div>
 	<div id="command-container">
 	<input type="text" id="command-input" placeholder="输入 Minecraft 命令...">

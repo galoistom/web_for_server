@@ -35,6 +35,7 @@ async function stopServer() {
 		const response = await fetch('/api/stop');
 		const text = await response.text();
 		logContainer.textContent = text;
+		refresh();
 	} catch (error) {
 		logContainer.textContent = '无法停止服务器：' + error;
 	}
@@ -75,7 +76,7 @@ async function refresh() {
 		}
 		
 		// Server is not running, show a message and exit
-		logContainer.textContent = "Server not running.";
+		logContainer.textContent = "Server not running";
 	} catch (error) {
 		console.error("Failed to fetch logs or check status:", error);
 		logContainer.textContent = "An error occurred while trying to connect to the server.";
@@ -97,7 +98,7 @@ async function checkServerStatus() {
             statusContainer.textContent = '状态: 已停止';
             statusContainer.className = 'status-stopped';
             stopPolling();
-            logContainer.textContent = "Server not running.";
+            logContainer.textContent = "Server not running";
         }
     } catch (error) {
         statusContainer.textContent = '状态: 错误';
@@ -115,7 +116,8 @@ async function sendCommand() {
 		const text = await response.text();
 		
 		if (text.includes('stopped')){
-			logContainer.textContent = "Server not running";
+			logContainer.textContent = "Command is useless when server is down >_<";
+			commandInput.value = '';
 			return
 		}
 	} catch (error) {
@@ -140,6 +142,8 @@ async function sendCommand() {
 
         const responseText = await response.text();
         console.log('response:', responseText);
+
+		commandInput.value = '';
 
     } catch (error) {
         console.error('failed to set:', error);
