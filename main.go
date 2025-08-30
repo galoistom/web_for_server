@@ -25,6 +25,13 @@ const (
 	RCON_PASSWORD = "1234abcd" // 替换为你的 RCON 密码
 )
 
+func checkStarted() bool {
+	if mcServerCmd != nil {
+		return true
+	}
+	return false
+}
+
 func startCli() {
 	go func() {
 		fmt.Println("Type 'exit' to quit the application.")
@@ -35,11 +42,7 @@ func startCli() {
 			case "exit":
 				{
 					fmt.Println("Exiting application...")
-					//resp, err := http.Get("http://127.0.0.1:8080/api/stop")
-					//if err == nil {
-					//	resp.Body.Close()
-					//}
-					if mcServerCmd != nil {
+					if checkStarted() {
 						resp, err := http.Get("http://127.0.0.1:8080/api/stop")
 						if err != nil {
 							fmt.Println("unable to connect to server", err)
@@ -78,12 +81,21 @@ func startCli() {
 	}()
 }
 
+func handlecheckStart(w http.ResponseWriter, r *http.Request) {
+	if checkStarted() {
+		w.Write([]byte("running"))
+	} else {
+		w.Write([]byte("stopped"))
+	}
+	// fmt.Println("checked")
+}
+
 // handleStart 函数，处理启动服务器的请求
 func handleStart(w http.ResponseWriter, r *http.Request) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	if mcServerCmd != nil {
+	if checkStarted() {
 		http.Error(w, "Minecraft server is already running.", http.StatusConflict)
 		return
 	}
@@ -98,8 +110,6 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Failed to start server process: %v", err), http.StatusInternalServerError)
 		return
 	}
-
-	// 启动一个 goroutine 实时读取日志
 
 	// 启动一个 goroutine 等待进程结束并清理
 	go func(cmd *exec.Cmd) {
@@ -154,12 +164,10 @@ func main() {
 	startCli()
 	http.Handle("/", http.FileServer(http.Dir("./static")))
 
-	// 添加新的路由
 	http.HandleFunc("/api/start", handleStart)
 	http.HandleFunc("/api/stop", handleStop)
 	http.HandleFunc("/api/log", handleWrite)
-	// 保留旧的路由
-	//http.HandleFunc("/api/say", handleSayWithRcon)
+	http.HandleFunc("/api/checkstart", handlecheckStart)
 
 	log.Println("Starting server on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

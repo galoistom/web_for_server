@@ -5,6 +5,20 @@
     <title>MC 服务器日志</title>
     <style>
         body { font-family: sans-serif; margin: 2rem; background-color: #f0f0f0; }
+
+        #status-container {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            color: #333;
+            z-index: 1000;
+        }
+        .status-running { background-color: #28a745; } /* 绿色背景 */
+        .status-stopped { background-color: #dc3545; } /* 红色背景 */
+
         #log-container {
             background-color: #fff;
             color: #333;
@@ -19,15 +33,19 @@
     </style>
 </head>
 <body>
+	<div id="status-container">unknown</div>
     <h1>Minecraft 服务器日志</h1>
     <button onclick="startServer()">启动服务器</button>
     <button onclick="stopServer()">停止服务器</button>
-    <button onclick="fetchLog()">查询日志</button>
+    <button onclick="refresh()">刷新</button>
     <div id="log-container"></div>
 
     <script>
         const logContainer = document.getElementById('log-container');
+		const statusContainer = document.getElementById('status-container');
         let pollingInterval;
+
+		
 
         // 启动服务器的函数
         async function startServer() {
@@ -65,20 +83,63 @@
             if (pollingInterval) {
                 clearInterval(pollingInterval);
             }
-            pollingInterval = setInterval(fetchLog, 3000);
+            pollingInterval = setInterval(refresh, 3000);
         }
 
         // 获取日志并更新页面的函数
-        async function fetchLog() {
+       async function refresh() {
+			try {
+				checkServerStatus();
+				// Step 1: Check server status first
+				const statusResponse = await fetch('/api/checkstart');
+				const statusText = await statusResponse.text();
+
+				// Step 2: Decide based on the status
+				if (statusText.includes('stopped')) {
+				// Server is not running, show a message and exit
+					logContainer.textContent = "Server not running.";
+					return;
+				}
+
+				// Step 3: Server is running, fetch logs as usual
+				const logResponse = await fetch('/api/log');
+				const logText = await logResponse.text();
+
+				// Update log container
+				logContainer.textContent = logText;
+				logContainer.scrollTop = logContainer.scrollHeight;
+				if (!pollingInterval) {
+					startPolling();
+				}
+
+			} catch (error) {
+				console.error("Failed to fetch logs or check status:", error);
+				logContainer.textContent = "An error occurred while trying to connect to the server.";
+			}
+		}
+
+		async function checkServerStatus() {
             try {
-                const response = await fetch('/api/log');
+                const response = await fetch('/api/checkstart');
                 const text = await response.text();
-                logContainer.textContent = text; 
-                logContainer.scrollTop = logContainer.scrollHeight;
+            
+                if (text.includes('running')) {
+                    statusContainer.textContent = 'running';
+                    statusContainer.className = 'status-running';
+                } else {
+                    statusContainer.textContent = 'stopped';
+                    statusContainer.className = 'status-stopped';
+                    logContainer.textContent = "Server not running.";
+                }
             } catch (error) {
-                console.error("获取日志失败:", error);
+                statusContainer.textContent = '状态: 错误';
+                statusContainer.className = 'status-stopped';
+                console.error("检查状态失败:", error);
             }
         }
+		window.onload = function() {
+			checkServerStatus();
+		}
     </script>
 </body>
 </html>
