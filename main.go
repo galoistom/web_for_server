@@ -195,6 +195,7 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("failed to send the order", err)
 	} else {
 		fmt.Println(resp)
+		w.Write([]byte(resp))
 	}
 
 }

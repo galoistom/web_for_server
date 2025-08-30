@@ -52,7 +52,7 @@ function startPolling() {
 	if (pollingInterval) {
 		clearInterval(pollingInterval);
 	}
-	pollingInterval = setInterval(refresh, 3000);
+	pollingInterval = setInterval(refresh, 5000);
 }
 
 // 获取日志并更新页面的函数
@@ -134,13 +134,13 @@ async function sendCommand() {
     try {
         // 将命令作为查询参数添加到 URL
         const response = await fetch(`/api/command?command=${encodeURIComponent(command)}`);
-
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`error: ${errorText}`);
         }
 
         const responseText = await response.text();
+		logContainer.textContent = responseText;
         console.log('response:', responseText);
 
 		commandInput.value = '';
