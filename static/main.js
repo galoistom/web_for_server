@@ -89,13 +89,13 @@ async function checkServerStatus() {
         const text = await response.text();
     
         if (text.includes('running')) {
-            statusContainer.textContent = '状态: 运行中';
+            statusContainer.textContent = 'running';
             statusContainer.className = 'status-running';
             if (!pollingInterval) {
                 startPolling();
             }
         } else {
-            statusContainer.textContent = '状态: 已停止';
+            statusContainer.textContent = 'stopped';
             statusContainer.className = 'status-stopped';
             stopPolling();
             logContainer.textContent = "Server not running";
