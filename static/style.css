@@ -14,7 +14,7 @@ body { font-family: sans-serif; margin: 2rem; background-color: #f0f0f0; }
 	padding: 8px 12px;
 	border-radius: 6px;
 	font-weight: bold;
-	color: #333;
+	color: white;
 	z-index: 1000;
 }
 .status-running { background-color: #28a745; } /* 绿色背景 */

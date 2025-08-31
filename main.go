@@ -3,12 +3,14 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"strings"
 	"sync"
+
 	//"time"
 
 	"github.com/gorcon/rcon"
@@ -32,6 +34,7 @@ func checkStarted() bool {
 	return false
 }
 
+// the function handleing the command from terminal(might not be used for a while)
 func startCli() {
 	go func() {
 		fmt.Println("Type 'exit' to quit the application.")
@@ -129,8 +132,14 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Minecraft server start command sent successfully."))
 }
 
-// handleStop 函数，处理停止服务器的请求
+// the function to handle the shutdown of server
 func handleStop(w http.ResponseWriter, r *http.Request) {
+	if !checkStarted() {
+		_, err := w.Write([]byte("The server can only be closed if it is already closed >_<"))
+		if err != nil {
+			fmt.Println("failed to write", err)
+		}
+	}
 	conn, err := rcon.Dial(RCON_HOST, RCON_PASSWORD)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("无法连接到 RCON 服务器：%v", err), http.StatusInternalServerError)
@@ -150,29 +159,38 @@ func handleStop(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "命令 'stop' 已发送。\n服务器响应：\n%s", response)
 }
 
-func handleWrite(w http.ResponseWriter, r *http.Request) {
+// the function to write the log to the web
+func handlelog(w http.ResponseWriter, r *http.Request) {
+
 	filename := "/home/liuziming/server/logs/latest.log"
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		fmt.Println("filed to read")
+		fmt.Println("filed to read", err)
 		http.Error(w, "unable to read", http.StatusInternalServerError)
 		return
 	}
 	_, err = w.Write(data)
 	if err != nil {
-		fmt.Println("Failed to write")
+		fmt.Println("Failed to write", err)
 	}
 }
 
 // handleCommand 处理来自网页端的命令请求
 func handleCommand(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
+	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "failed to requedt body", http.StatusInternalServerError)
+		return
+	}
+	defer r.Body.Close()
+
 	// 从 URL 查询参数中获取 "command"
-	command := r.URL.Query().Get("command")
+	command := string(body)
 	if command == "" {
 		http.Error(w, "Command is empty", http.StatusBadRequest)
 		return
@@ -182,14 +200,26 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 
 	if !checkStarted() {
 		fmt.Println("the server is not started yet")
+		if command == "start" {
+			resp, err := http.Get("http://127.0.0.1:8080/api/start")
+			if err != nil {
+				fmt.Println("Error closing server", err)
+			} else {
+				resp.Body.Close()
+			}
+		}
+		w.Write([]byte("It is pointless to send commands when server is down >_< (type \"start\" to start the server)"))
 		return
 	}
+
 	conn, err := rcon.Dial(RCON_HOST, RCON_PASSWORD)
 	if err != nil {
 		fmt.Println("Unable to connect to server", err)
 		return
 	}
+
 	defer conn.Close()
+
 	resp, err := conn.Execute(command)
 	if err != nil {
 		fmt.Println("failed to send the order", err)
@@ -206,7 +236,7 @@ func main() {
 
 	http.HandleFunc("/api/start", handleStart)
 	http.HandleFunc("/api/stop", handleStop)
-	http.HandleFunc("/api/log", handleWrite)
+	http.HandleFunc("/api/log", handlelog)
 	http.HandleFunc("/api/checkstart", handlecheckStart)
 	http.HandleFunc("/api/command", handleCommand)
 

@@ -2,20 +2,7 @@ const logContainer = document.getElementById('log-container');
 const statusContainer = document.getElementById('status-container');
 let pollingInterval;
 
-async function abstract_checkstatus() {
-	try {
-		const response = await fetch('/api/checkstart');
-		const text = await response.text();
-		if (text.includes('running')){
-			return true
-		} else{
-			return false
-		}
-	} catch (error) {
-		console.error("failed to get info:", error)
-	}
-}
-        // 启动服务器的函数
+// 启动服务器的函数
 async function startServer() {
 	try {
 		const response = await fetch('/api/start');
@@ -84,73 +71,68 @@ async function refresh() {
 }
 
 async function checkServerStatus() {
-    try {
-        const response = await fetch('/api/checkstart');
-        const text = await response.text();
-    
-        if (text.includes('running')) {
-            statusContainer.textContent = 'running';
-            statusContainer.className = 'status-running';
-            if (!pollingInterval) {
-                startPolling();
-            }
-        } else {
-            statusContainer.textContent = 'stopped';
-            statusContainer.className = 'status-stopped';
-            stopPolling();
-            logContainer.textContent = "Server not running";
-        }
-    } catch (error) {
-        statusContainer.textContent = '状态: 错误';
-        statusContainer.className = 'status-stopped';
-        console.error("检查状态失败:", error);
-        stopPolling();
-    }
-}
-
-async function sendCommand() {
-    const commandInput = document.getElementById('command-input');
-    const command = commandInput.value;
 	try {
 		const response = await fetch('/api/checkstart');
 		const text = await response.text();
-		
-		if (text.includes('stopped')){
-			logContainer.textContent = "Command is useless when server is down >_<";
-			commandInput.value = '';
-			return
+	
+		if (text.includes('running')) {
+			statusContainer.textContent = 'running';
+			statusContainer.className = 'status-running';
+			if (!pollingInterval) {
+				startPolling();
+			}
+		} else {
+			statusContainer.textContent = 'stopped';
+			statusContainer.className = 'status-stopped';
+			stopPolling();
+			logContainer.textContent = "Server not running";
 		}
 	} catch (error) {
-		logContainer.textContent = "failed to check the state of the server";
-		console.error("failed to check state",error);
-		return
+		statusContainer.textContent = '状态: 错误';
+		statusContainer.className = 'status-stopped';
+		console.error("检查状态失败:", error);
+		stopPolling();
+	}
+}
+
+async function sendCommand() {
+	const commandInput = document.getElementById('command-input');
+	const command = commandInput.value.trim(); // 使用 .trim() 移除前后空格
+
+	if (command === '') {
+		alert("请输入命令！");
+		return;
 	}
 
-    if (command === '') {
-        alert("请输入命令！");
-        return;
-    }
+	try {
+		const response = await fetch('/api/command', {
+			method: 'POST',
+			// 告诉后端我们发送的是纯文本
+			headers: {
+				'Content-Type': 'text/plain'
+			},
+			// 直接发送纯文本字符串作为请求体
+			body: command
+		});
 
-    try {
-        // 将命令作为查询参数添加到 URL
-        const response = await fetch(`/api/command?command=${encodeURIComponent(command)}`);
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`error: ${errorText}`);
-        }
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(`error: ${errorText}`);
+		}
 
-        const responseText = await response.text();
+		const responseText = await response.text();
+		console.log('response:', responseText);
+
 		logContainer.textContent = responseText;
-        console.log('response:', responseText);
-
+		stopPolling();
 		commandInput.value = '';
 
-    } catch (error) {
-        console.error('failed to set:', error);
-        alert(`command failed to send: ${error.message}`);
-    }
+	} catch (error) {
+		console.error('failed to set:', error);
+		alert(`command failed to send: ${error.message}`);
+	}
 
-    commandInput.value = '';
+	commandInput.value = '';
 }
 
 window.onload = function() {
