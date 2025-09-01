@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -16,15 +17,17 @@ import (
 	"github.com/gorcon/rcon"
 )
 
+type Config struct {
+	RCON_HOST     string
+	RCON_PASSWORD string
+	PORT          string
+	LOG_POST      string
+}
+
 var (
 	mcServerCmd *exec.Cmd  // 存储服务器进程的命令对象
 	mu          sync.Mutex // 保护共享变量的锁
-)
-
-// RCON配置
-const (
-	RCON_HOST     = "0.0.0.0:25575"
-	RCON_PASSWORD = "1234abcd" // 替换为你的 RCON 密码
+	webConfig   Config
 )
 
 func checkStarted() bool {
@@ -46,7 +49,7 @@ func startCli() {
 				{
 					fmt.Println("Exiting application...")
 					if checkStarted() {
-						resp, err := http.Get("http://127.0.0.1:8080/api/stop")
+						resp, err := http.Get("http://127.0.0.1:" + webConfig.PORT + "/api/stop")
 						if err != nil {
 							fmt.Println("unable to connect to server", err)
 						} else {
@@ -57,7 +60,7 @@ func startCli() {
 				} // 安全退出程序
 			case "start":
 				{
-					resp, err := http.Get("http://127.0.0.1:8080/api/start")
+					resp, err := http.Get("http://127.0.0.1:" + webConfig.PORT + "/api/start")
 					if err != nil {
 						fmt.Println("Error closing server", err)
 					} else {
@@ -70,7 +73,7 @@ func startCli() {
 						fmt.Println("the server is not started yet")
 						continue
 					}
-					conn, err := rcon.Dial(RCON_HOST, RCON_PASSWORD)
+					conn, err := rcon.Dial(webConfig.RCON_HOST, webConfig.RCON_PASSWORD)
 					if err != nil {
 						fmt.Println("Unable to connect to server", err)
 						continue
@@ -140,7 +143,7 @@ func handleStop(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("failed to write", err)
 		}
 	}
-	conn, err := rcon.Dial(RCON_HOST, RCON_PASSWORD)
+	conn, err := rcon.Dial(webConfig.RCON_HOST, webConfig.RCON_PASSWORD)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("无法连接到 RCON 服务器：%v", err), http.StatusInternalServerError)
 		log.Printf("RCON 连接错误：%v", err)
@@ -162,7 +165,7 @@ func handleStop(w http.ResponseWriter, r *http.Request) {
 // the function to write the log to the web
 func handlelog(w http.ResponseWriter, r *http.Request) {
 
-	filename := "/home/liuziming/server/logs/latest.log"
+	filename := webConfig.LOG_POST
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		fmt.Println("filed to read", err)
@@ -201,7 +204,7 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 	if !checkStarted() {
 		fmt.Println("the server is not started yet")
 		if command == "start" {
-			resp, err := http.Get("http://127.0.0.1:8080/api/start")
+			resp, err := http.Get("http://127.0.0.1:" + webConfig.PORT + "/api/start")
 			if err != nil {
 				fmt.Println("Error closing server", err)
 			} else {
@@ -212,7 +215,7 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conn, err := rcon.Dial(RCON_HOST, RCON_PASSWORD)
+	conn, err := rcon.Dial(webConfig.RCON_HOST, webConfig.RCON_PASSWORD)
 	if err != nil {
 		fmt.Println("Unable to connect to server", err)
 		return
@@ -230,6 +233,23 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func init() {
+	log.Println("Initializing...")
+
+	fileContent, err := os.ReadFile("config.json")
+	if err != nil {
+		log.Fatalf("Error occoured when reading: %v", err)
+		return
+	}
+
+	err = json.Unmarshal(fileContent, &webConfig)
+	if err != nil {
+		log.Fatalf("Error unamarshalling JSON: %v", err)
+	} else {
+		log.Println("Config loaded successfully")
+	}
+}
+
 func main() {
 	startCli()
 	http.Handle("/", http.FileServer(http.Dir("./static")))
@@ -240,6 +260,6 @@ func main() {
 	http.HandleFunc("/api/checkstart", handlecheckStart)
 	http.HandleFunc("/api/command", handleCommand)
 
-	log.Println("Starting server on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Println("Starting server on :" + webConfig.PORT)
+	log.Fatal(http.ListenAndServe(":"+webConfig.PORT, nil))
 }
