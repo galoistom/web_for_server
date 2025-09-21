@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"github.com/gorcon/rcon"
 	"io"
 	"log"
 	"net/http"
@@ -11,10 +12,6 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-
-	//"time"
-
-	"github.com/gorcon/rcon"
 )
 
 type Config struct {
@@ -165,8 +162,7 @@ func handleStop(w http.ResponseWriter, r *http.Request) {
 // the function to write the log to the web
 func handlelog(w http.ResponseWriter, r *http.Request) {
 
-	filename := webConfig.LOG_POST
-	data, err := os.ReadFile(filename)
+	data, err := os.ReadFile(webConfig.LOG_POST)
 	if err != nil {
 		fmt.Println("filed to read", err)
 		http.Error(w, "unable to read", http.StatusInternalServerError)
