@@ -18,7 +18,7 @@ type Config struct {
 	RCON_HOST     string
 	RCON_PASSWORD string
 	PORT          string
-	LOG_POST      string
+	SERVER_POST   string
 }
 
 var (
@@ -110,13 +110,18 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 	// 启动 Minecraft 服务器进程
 
 	cmd := exec.Command("/bin/bash", "./server.sh")
-
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		log.Fatalf("failed to get pipe:%v", err)
+	}
 	// 启动进程
-	err := cmd.Start()
+	err = cmd.Start()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to start server process: %v", err), http.StatusInternalServerError)
 		return
 	}
+	defer stdin.Close()
+	_, err = io.WriteString(stdin, webConfig.SERVER_POST)
 	// 启动一个 goroutine 等待进程结束并清理
 	go func(cmd *exec.Cmd) {
 		log.Printf("Minecraft server process (PID: %d) has started...", cmd.Process.Pid)
@@ -161,7 +166,7 @@ func handleStop(w http.ResponseWriter, r *http.Request) {
 // the function to write the log to the web
 func handlelog(w http.ResponseWriter, r *http.Request) {
 
-	data, err := os.ReadFile(webConfig.LOG_POST)
+	data, err := os.ReadFile(webConfig.SERVER_POST + "logs/latest.log")
 	if err != nil {
 		fmt.Println("filed to read", err)
 		http.Error(w, "unable to read", http.StatusInternalServerError)
