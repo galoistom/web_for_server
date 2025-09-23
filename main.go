@@ -109,7 +109,7 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 
 	// 启动 Minecraft 服务器进程
 
-	cmd := exec.Command("/bin/bash", "./server.sh")
+	cmd := exec.Command("/bin/bash", "../server.sh")
 
 	// 启动进程
 	err := cmd.Start()
