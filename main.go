@@ -109,7 +109,7 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 
 	// 启动 Minecraft 服务器进程
 
-	cmd := exec.Command("/bin/bash", "../server.sh")
+	cmd := exec.Command("/bin/bash", "./server.sh")
 
 	// 启动进程
 	err := cmd.Start()
@@ -117,7 +117,6 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Failed to start server process: %v", err), http.StatusInternalServerError)
 		return
 	}
-
 	// 启动一个 goroutine 等待进程结束并清理
 	go func(cmd *exec.Cmd) {
 		log.Printf("Minecraft server process (PID: %d) has started...", cmd.Process.Pid)

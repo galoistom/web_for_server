@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+	<title>MC serverhub</title>
+	<link rel="stylesheet" href="style.css">
+	<link rel="icon" type="image/png" href="logo.png">
+</head>
+<body>
+	<div id="status-container">unknown</div>
+	<h1>Minecraft 服务器控制台</h1>
+	<div id="button-container">
+		<button onclick="startServer()">启动服务器</button>
+		<button onclick="stopServer()">停止服务器</button>
+		<button onclick="refresh()">刷新</button>
+	</div>
+	<p></p>
+	<div id="log-container"></div>
+	<div id="command-container">
+	<input type="text" id="command-input" placeholder="输入 Minecraft 命令...">
+	<button onclick="sendCommand()">发送命令</button>
+	</div>
+	<script src="main.js"></script>
+</body>
+</html>

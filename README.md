@@ -11,3 +11,8 @@ https://www.bilibili.com/video/BV1fD4y1m7TD
 https://www.bilibili.com/video/BV1Xv411k7Xn
 
 These vedios are great and helps me a lot **orz**
+
+---
+
+# Usage
+Downloads the mainpack dirctionary, and put the right build for your system, and run it. Please make sure you have start the rcon service in server.property (settings can be changed to suit your need in config.json). Move the server file to ~/server/ and rename it to "server.jar" (or change the script "server.sh" if you like)

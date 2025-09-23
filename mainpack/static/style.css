@@ -1,0 +1,60 @@
+body { font-family: sans-serif; margin: 2rem; background-color: #f0f0f0; }
+
+#button-container {
+    display: flex;
+    justify-content: left; /* 水平居中 */
+    gap: 10px; /* 在按钮之间添加间距 */
+    margin-top: 20px; /* 顶部外边距 */
+}
+
+#status-container {
+	position: fixed;
+	top: 10px;
+	right: 10px;
+	padding: 8px 12px;
+	border-radius: 6px;
+	font-weight: bold;
+	color: white;
+	z-index: 1000;
+}
+.status-running { background-color: #28a745; } /* 绿色背景 */
+.status-stopped { background-color: #dc3545; } /* 红色背景 */
+
+#log-container {
+	background-color: #fff;
+	color: #333;
+	padding: 1rem;
+	border-radius: 8px;
+	height: 650px;
+	overflow-y: scroll;
+	white-space: pre-wrap;
+	font-family: monospace;
+}
+ 
+#command-container {
+	display: flex;
+	justify-content: center; /* 水平居中 */
+	align-items: center; /* 垂直居中，如果需要的话 */
+	width: 100%; /* 让容器占据整个页面宽度 */
+	margin-top: 20px; /* 添加一些顶部外边距 */
+}
+
+/* 调整输入框和按钮的样式，让它们看起来更协调 */
+#command-input {
+	width: 300px;
+	padding: 8px;
+	font-size: 1rem;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	margin-right: 10px; /* 在输入框和按钮之间添加一些空间 */
+}
+
+button {
+	padding: 10px 15px;
+	font-size: 1rem;
+	cursor: pointer;
+	border: none;
+	border-radius: 4px;
+	background-color: #007bff;
+	color: white;
+}

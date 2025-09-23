@@ -1,0 +1,6 @@
+{
+	"RCON_HOST":"0.0.0.0:25575",
+	"RCON_PASSWORD":"1234abcd",
+	"PORT":"8080",
+	"LOG_POST":"$HOME/server/logs/latest.log"
+}
