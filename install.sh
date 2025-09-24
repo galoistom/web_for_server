@@ -6,7 +6,7 @@ if [ $t == "no" ]; then
 fi
 
 curl -L -O "https://github.com/galoistom/web_for_server/blob/main/mainpack.tar.gz"
-tar -czvf ./mainpack.tar.gz
+tar -xzvf ./mainpack.tar.gz
 cd ./mainpack/
 echo "choose your operating system (1 for windows, 2 for mac, 3 for linux)"
 read oper
