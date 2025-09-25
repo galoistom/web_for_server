@@ -1,4 +1,5 @@
 #!/bin/bash
+
 echo "are you going to install in this dictionary? (yes/no)"
 read t
 if [ $t == "yes" ]; then
@@ -8,7 +9,7 @@ if [ $t == "yes" ]; then
 	echo "choose your operating system (1 for windows, 2 for mac, 3 for linux)"
 	read oper
 	if [ $oper == "1" ]; then
-		echo "windows version not quite ready, if you are in wsl, choose 3 for linux"
+		echo "windows version not quite ready, please use wsl or other solution and choose 3 for linux"
 		#curl -L -O "https://raw.githubusercontent.com/galoistom/web_for_server/main/build/web_for_server_win_x86"
 		#chmod +x ./web_for_server_win_x86.exe
 	elif [ $oper == "2" ]; then
