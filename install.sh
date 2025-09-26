@@ -19,10 +19,10 @@ if [ $t == "yes" ]; then
 		echo "choose your chip (1 for x86, 2 for arm)"
 		read chip
 		if [ $chip == "1" ]; then
-			curl -L -O "https://github.com/galoistom/web_for_server/main/build/web_for_server_linux_x86"
+			curl -L -O "https://raw.githubusercontent.com/galoistom/web_for_server/main/build/web_for_server_linux_x86"
 			chmod +x ./web_for_server_linux_x86
 		elif [ $chip == "2" ]; then
-			curl -L -O "https://github.com/galoistom/web_for_server/main/build/web_for_server_linux_arm"
+			curl -L -O "https://raw.githubusercontent.com/galoistom/web_for_server/main/build/web_for_server_linux_arm"
 			chmod +x ./web_for_server_linux_arm
 		else
 			echo "input wrongly"
