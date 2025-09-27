@@ -18,3 +18,5 @@ These vedios are great and helps me a lot **orz**
 Downloads the mainpack dirctionary, and put the right build for your system, and run it. Please make sure you have start the rcon service in server.property (settings can be changed to suit your need in config.json). Move the server file to ~/server/ and rename it to "server.jar" (or change the script "server.sh" if you like)
 
 Or you can simply use the install script. Change the config file for the position for your server (however you shoud rename the jar file into server.jar)
+
+Now we added the feature to download necssary files when running the main file, so install.sh is not really needed >_<
