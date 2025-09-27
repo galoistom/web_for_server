@@ -1,4 +1,4 @@
-module github.com/liuziming/go_test
+module github.com/liuziming/web_for_server
 
 go 1.25.0
 

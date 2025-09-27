@@ -146,8 +146,8 @@ func handleStop(w http.ResponseWriter, r *http.Request) {
 	}
 	conn, err := rcon.Dial(webConfig.RCON_HOST, webConfig.RCON_PASSWORD)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("无法连接到 RCON 服务器：%v", err), http.StatusInternalServerError)
-		log.Printf("RCON 连接错误：%v", err)
+		http.Error(w, fmt.Sprintf("fialed to connect to RCON server:%v", err), http.StatusInternalServerError)
+		log.Printf("RCON error while connecting:%v", err)
 		return
 	}
 	defer conn.Close()
@@ -155,12 +155,12 @@ func handleStop(w http.ResponseWriter, r *http.Request) {
 	// 发送 "stop" 命令
 	response, err := conn.Execute("stop")
 	if err != nil {
-		http.Error(w, fmt.Sprintf("发送命令失败：%v", err), http.StatusInternalServerError)
-		log.Printf("RCON 命令错误：%v", err)
+		http.Error(w, fmt.Sprintf("failed to send command:%v", err), http.StatusInternalServerError)
+		log.Printf("RCON fialed to send:%v", err)
 		return
 	}
 
-	fmt.Fprintf(w, "命令 'stop' 已发送。\n服务器响应：\n%s", response)
+	fmt.Fprintf(w, "command 'stop' is sent\n with response \n%s", response)
 }
 
 // the function to write the log to the web
@@ -235,11 +235,49 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 
 func init() {
 	log.Println("Initializing...")
+	b, err := CheckExist("config.json")
+	fmt.Println("checking config file")
+	if err != nil {
+		log.Fatalf("Error occoured when checking config.json file, make sure that is exists: %v", err)
+		os.Exit(1)
+	}
+
+	if !b {
+		log.Println("config.json does not exit, downloaing...")
+		DownloadFile("config.json", "https://raw.githubusercontent.com/galoistom/web_for_server/main/config.json")
+	}
+
+	b, err = CheckExist("server.sh")
+	fmt.Println("checking server file")
+	if err != nil {
+		log.Fatalf("Error occoured when checking server.sh file, make sure that is exists: %v", err)
+		os.Exit(1)
+	}
+
+	if !b {
+		log.Println("server.sh does not exit, downloaing...")
+		DownloadFile("server.sh", "https://raw.githubusercontent.com/galoistom/web_for_server/main/server.sh")
+	}
+
+	b, err = CheckExist("static")
+	fmt.Println("checking static folder")
+	if err != nil {
+		log.Fatalf("Error occoured when checking static dictionary, make sure that is exists: %v", err)
+		os.Exit(1)
+	}
+
+	if !b {
+		log.Println("staric folder does not exists, downloading...")
+		DownloadFileToDir("static", "index.html", "https://raw.githubusercontent.com/galoistom/web_for_server/main/static/index.html")
+		DownloadFileToDir("static", "style.css", "https://raw.githubusercontent.com/galoistom/web_for_server/main/static/style.css")
+		DownloadFileToDir("static", "logo.png", "https://raw.githubusercontent.com/galoistom/web_for_server/main/static/logo.png")
+		DownloadFileToDir("static", "main.js", "https://raw.githubusercontent.com/galoistom/web_for_server/main/static/main.js")
+	}
 
 	fileContent, err := os.ReadFile("config.json")
 	if err != nil {
 		log.Fatalf("Error occoured when reading: %v", err)
-		return
+		os.Exit(1)
 	}
 
 	err = json.Unmarshal(fileContent, &webConfig)
