@@ -235,45 +235,44 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 
 func init() {
 	log.Println("Initializing...")
-	b, err := CheckExist("config.json")
-	fmt.Println("checking config file")
-	if err != nil {
-		log.Fatalf("Error occoured when checking config.json file, make sure that is exists: %v", err)
-		os.Exit(1)
+	const site = "https://raw.githubusercontent.com/galoistom/web_for_server/main/"
+	//check necessary file
+	check_list := [2]string{"config.json", "server.sh"}
+	for _, file := range check_list {
+		b, err := CheckExist(file)
+		fmt.Println("checking " + file + " file")
+		if err != nil {
+			log.Fatalf("Error occoured when checking config.json file, make sure that is exists: %v", err)
+			os.Exit(1)
+		}
+		if !b {
+			log.Println("config.json does not exit, downloaing...")
+			err = DownloadFile(file, site+file)
+			if err != nil {
+				log.Println("Init stopped, please check you folder")
+				os.Exit(1)
+			}
+		}
 	}
-
-	if !b {
-		log.Println("config.json does not exit, downloaing...")
-		DownloadFile("config.json", "https://raw.githubusercontent.com/galoistom/web_for_server/main/config.json")
-	}
-
-	b, err = CheckExist("server.sh")
-	fmt.Println("checking server file")
-	if err != nil {
-		log.Fatalf("Error occoured when checking server.sh file, make sure that is exists: %v", err)
-		os.Exit(1)
-	}
-
-	if !b {
-		log.Println("server.sh does not exit, downloaing...")
-		DownloadFile("server.sh", "https://raw.githubusercontent.com/galoistom/web_for_server/main/server.sh")
-	}
-
-	b, err = CheckExist("static")
+	//check static folder
+	b, err := CheckExist("static")
 	fmt.Println("checking static folder")
 	if err != nil {
 		log.Fatalf("Error occoured when checking static dictionary, make sure that is exists: %v", err)
 		os.Exit(1)
 	}
-
 	if !b {
 		log.Println("staric folder does not exists, downloading...")
-		DownloadFileToDir("static", "index.html", "https://raw.githubusercontent.com/galoistom/web_for_server/main/static/index.html")
-		DownloadFileToDir("static", "style.css", "https://raw.githubusercontent.com/galoistom/web_for_server/main/static/style.css")
-		DownloadFileToDir("static", "logo.png", "https://raw.githubusercontent.com/galoistom/web_for_server/main/static/logo.png")
-		DownloadFileToDir("static", "main.js", "https://raw.githubusercontent.com/galoistom/web_for_server/main/static/main.js")
+		static_list := [4]string{"index.html", "style.css", "logo.png", "main.js"}
+		for _, file := range static_list {
+			err = DownloadFileToDir("static", file, site+"static/"+file)
+			if err != nil {
+				log.Println("Init stopped, please check you folder")
+				os.Exit(1)
+			}
+		}
 	}
-
+	//reading config file
 	fileContent, err := os.ReadFile("config.json")
 	if err != nil {
 		log.Fatalf("Error occoured when reading: %v", err)
