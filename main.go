@@ -114,6 +114,10 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatalf("failed to get pipe:%v", err)
 	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Fatalf("failed to get out pipe:%v", err)
+	}
 	// 启动进程
 	err = cmd.Start()
 	if err != nil {
@@ -121,11 +125,29 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer stdin.Close()
+	//defer stdout.Close()
 	_, err = io.WriteString(stdin, webConfig.SERVER_POST)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer stdout.Close()
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			fmt.Printf("%s\n", scanner.Text())
+		}
+		if scanner.Err() != nil && scanner.Err() != io.EOF {
+			log.Printf("ERROR: Error reading server output: %v", scanner.Err())
+		}
+	}()
+
 	// 启动一个 goroutine 等待进程结束并清理
 	go func(cmd *exec.Cmd) {
 		log.Printf("Minecraft server process (PID: %d) has started...", cmd.Process.Pid)
+		fmt.Println("1")
 		cmd.Wait()
+		fmt.Println("2")
 		log.Println("Minecraft server process has stopped.")
 		mu.Lock()
 		mcServerCmd = nil
