@@ -2,5 +2,6 @@
 	"RCON_HOST":"0.0.0.0:25575",
 	"RCON_PASSWORD":"1234abcd",
 	"PORT":"8080",
-	"SERVER_POST":"/home/galoistom/server/"
+	"SERVER_POST":"/home/galoistom/server/",
+	"SHOW_LOG":"false"
 }

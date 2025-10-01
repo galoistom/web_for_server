@@ -19,6 +19,7 @@ type Config struct {
 	RCON_PASSWORD string
 	PORT          string
 	SERVER_POST   string
+	SHOW_LOG      string
 }
 
 var (
@@ -185,6 +186,13 @@ func handleStop(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "command 'stop' is sent\n with response \n%s", response)
 }
 
+func handlenolog(w http.ResponseWriter, r *http.Request) {
+	_, err := w.Write([]byte("server is running now"))
+	if err != nil {
+		log.Fatalln("Failed to write", err)
+	}
+}
+
 // the function to write the log to the web
 func handlelog(w http.ResponseWriter, r *http.Request) {
 
@@ -315,9 +323,14 @@ func main() {
 
 	http.HandleFunc("/api/start", handleStart)
 	http.HandleFunc("/api/stop", handleStop)
-	http.HandleFunc("/api/log", handlelog)
 	http.HandleFunc("/api/checkstart", handlecheckStart)
 	http.HandleFunc("/api/command", handleCommand)
+	if webConfig.SHOW_LOG == "true" {
+		http.HandleFunc("/api/log", handlelog)
+	} else {
+		http.HandleFunc("/api/log", handlenolog)
+	}
+	//	http.HandleFunc("/api/log", handlelog)
 
 	log.Println("Starting server on :" + webConfig.PORT)
 	log.Fatal(http.ListenAndServe(":"+webConfig.PORT, nil))
