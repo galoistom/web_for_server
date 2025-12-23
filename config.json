@@ -3,5 +3,5 @@
 	"RCON_PASSWORD":"1234abcd",
 	"PORT":"8080",
 	"SERVER_POST":"/home/galoistom/server/",
-	"SHOW_LOG":"false"
+	"SHOW_LOG":"true"
 }

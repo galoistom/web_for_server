@@ -110,25 +110,24 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 
 	// 启动 Minecraft 服务器进程
 
-	cmd := exec.Command("/bin/bash", "./server.sh")
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		log.Fatalf("failed to get pipe:%v", err)
-	}
+	cmd := exec.Command("/bin/bash", webConfig.SERVER_POST+"server.sh")
+	//	stdin, err := cmd.StdinPipe()
+	//	if err != nil {
+	//		log.Fatalf("failed to get pipe:%v", err)
+	//	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		log.Fatalf("failed to get out pipe:%v", err)
 	}
-	// 启动进程
+	//	// 启动进程
 	err = cmd.Start()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to start server process: %v", err), http.StatusInternalServerError)
 		return
 	}
-	defer stdin.Close()
+	//	defer stdin.Close()
 	//defer stdout.Close()
-	_, err = io.WriteString(stdin, webConfig.SERVER_POST)
-
+	//	_, err = io.WriteString(stdin, webConfig.SERVER_POST)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -146,9 +145,7 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 	// 启动一个 goroutine 等待进程结束并清理
 	go func(cmd *exec.Cmd) {
 		log.Printf("Minecraft server process (PID: %d) has started...", cmd.Process.Pid)
-		fmt.Println("1")
 		cmd.Wait()
-		fmt.Println("2")
 		log.Println("Minecraft server process has stopped.")
 		mu.Lock()
 		mcServerCmd = nil
