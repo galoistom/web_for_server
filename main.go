@@ -2,16 +2,19 @@ package main
 
 import (
 	"bufio"
+	"embed"
 	"encoding/json"
 	"fmt"
-	"github.com/gorcon/rcon"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"strings"
 	"sync"
+
+	"github.com/gorcon/rcon"
 )
 
 type Config struct {
@@ -26,6 +29,8 @@ var (
 	mcServerCmd *exec.Cmd  // 存储服务器进程的命令对象
 	mu          sync.Mutex // 保护共享变量的锁
 	webConfig   Config
+	//go:embed static/*
+	indexDir embed.FS
 )
 
 func checkStarted() bool {
@@ -109,8 +114,9 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 启动 Minecraft 服务器进程
-
-	cmd := exec.Command("/bin/bash", webConfig.SERVER_POST+"server.sh")
+	cmd := exec.Command("java", "-Xmx6G", "-jar", "./server.jar", "nogui")
+	cmd.Dir = webConfig.SERVER_POST
+	//cmd := exec.Command("/bin/bash", webConfig.SERVER_POST+"server.sh")
 	//	stdin, err := cmd.StdinPipe()
 	//	if err != nil {
 	//		log.Fatalf("failed to get pipe:%v", err)
@@ -264,39 +270,19 @@ func init() {
 	log.Println("Initializing...")
 	const site = "https://raw.githubusercontent.com/galoistom/web_for_server/main/"
 	//check necessary file
-	check_list := [2]string{"config.json", "server.sh"}
-	for _, file := range check_list {
-		b, err := CheckExist(file)
-		fmt.Println("checking " + file + " file")
-		if err != nil {
-			log.Fatalf("Error occoured when checking config.json file, make sure that is exists: %v", err)
-			os.Exit(1)
-		}
-		if !b {
-			log.Println("config.json does not exit, downloaing...")
-			err = DownloadFile(file, site+file)
-			if err != nil {
-				log.Println("Init stopped, please check you folder")
-				os.Exit(1)
-			}
-		}
-	}
-	//check static folder
-	b, err := CheckExist("static")
-	fmt.Println("checking static folder")
+	file := "config.json"
+	b, err := CheckExist(file)
+	fmt.Println("checking " + file + " file")
 	if err != nil {
-		log.Fatalf("Error occoured when checking static dictionary, make sure that is exists: %v", err)
+		log.Fatalf("Error occoured when checking config.json file, make sure that is exists: %v", err)
 		os.Exit(1)
 	}
 	if !b {
-		log.Println("staric folder does not exists, downloading...")
-		static_list := [4]string{"index.html", "style.css", "logo.png", "main.js"}
-		for _, file := range static_list {
-			err = DownloadFileToDir("static", file, site+"static/"+file)
-			if err != nil {
-				log.Println("Init stopped, please check you folder")
-				os.Exit(1)
-			}
+		log.Println("config.json does not exit, downloaing...")
+		err = DownloadFile(file, site+file)
+		if err != nil {
+			log.Println("Init stopped, please check you folder")
+			os.Exit(1)
 		}
 	}
 	//reading config file
@@ -316,8 +302,12 @@ func init() {
 
 func main() {
 	startCli()
-	http.Handle("/", http.FileServer(http.Dir("./static")))
-
+	dist, err := fs.Sub(indexDir, "static")
+	if err != nil {
+		panic(err)
+	}
+	http.Handle("/", http.FileServer(http.FS(dist)))
+	// 建议改为这样，确保外部可以访问
 	http.HandleFunc("/api/start", handleStart)
 	http.HandleFunc("/api/stop", handleStop)
 	http.HandleFunc("/api/checkstart", handlecheckStart)
@@ -327,7 +317,6 @@ func main() {
 	} else {
 		http.HandleFunc("/api/log", handlenolog)
 	}
-	//	http.HandleFunc("/api/log", handlelog)
 
 	log.Println("Starting server on :" + webConfig.PORT)
 	log.Fatal(http.ListenAndServe(":"+webConfig.PORT, nil))

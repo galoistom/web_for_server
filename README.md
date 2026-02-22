@@ -15,8 +15,5 @@ These vedios are great and helps me a lot **orz**
 ---
 
 # Usage
-Downloads the mainpack dirctionary, and put the right build for your system, and run it. Please make sure you have start the rcon service in server.property (settings can be changed to suit your need in config.json). Move the server file to ~/server/ and rename it to "server.jar" (or change the script "server.sh" if you like)
+To use this software, all you have to do is to go into the build folder or the release page, download the correct verison, the first time it will ask you to download a config.json file, in which you configure your rcon, server position, and the port you want to host the web, please remember to rename your server executable into server.jar. After finishing the configurarion, you may restart the program and it will start working.
 
-Or you can simply use the install script. Change the config file for the position for your server (however you shoud rename the jar file into server.jar)
-
-Now we added the feature to download necssary files when running the main file, so install.sh is not really needed >_<
