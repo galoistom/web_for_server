@@ -6,10 +6,18 @@ let pollingInterval;
 async function startServer() {
 	try {
 		const response = await fetch('/api/start');
-		const text = await response.text();
-		logContainer.textContent = text;
-		// 启动服务器后，开始轮询日志
-		startPolling();
+	        const text = await response.text();
+	        if (response.ok) {
+		        // 成功的情况 (200 OK)
+		        logContainer.textContent = "✅ " + text;
+		        startPolling(); // 开始刷新日志
+		} else {
+		        // 失败的情况 (409, 500 等)
+		        logContainer.innerHTML = `<span style="color: #ff4444;">❌ ${text}</span>`;
+		}
+	        logContainer.textContent = text;
+	        // 启动服务器后，开始轮询日志
+	        startPolling();
 	} catch (error) {
 		logContainer.textContent = '无法启动服务器：' + error;
 	}
