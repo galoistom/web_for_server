@@ -15,5 +15,16 @@ These vedios are great and helps me a lot **orz**
 ---
 
 # Usage
-To use this software, all you have to do is to go into the build folder or the release page, download the correct verison, the first time it will ask you to download a config.json file, in which you configure your rcon, server position, and the port you want to host the web, please remember to rename your server executable into server.jar. After finishing the configurarion, you may restart the program and it will start working.
+Simply Download the correct version for your os and chip, then it will automatically genreate the config file needed as config.json.
 
+Modify the configs to fit you needs and restart, it will load all of your settings.
+
+rcon_host, password: the port of rcon that is connected to you minecraft server, which should meet your settings in server.porperties
+
+port: the port you want the web to be
+
+server_path: the position of your server, should be absolut position.
+
+start_command: the command to start your server, it will be executed in server_path, so accept relative path and your own script
+
+show_log: whether you want to present the log file on the web, use ture or false.

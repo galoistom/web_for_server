@@ -264,13 +264,11 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 }
 
 func saveConfig(cfg Config) error {
- 
     // 第二个参数是前缀（通常为空），第三个参数是缩进（这里用4个空格）
     data, err := json.MarshalIndent(cfg, "", "    ")
     if err != nil {
         return err
     }
-
     // 2. 将数据写入文件，0644 是标准的权限设置
     return os.WriteFile("config.json", data, 0644)
 }
@@ -286,7 +284,6 @@ func init() {
 		SERVER_PATH: "$HOME/server/",
 		SHOW_LOG: "true",
 	}
-//	const site = "https://raw.githubusercontent.com/galoistom/web_for_server/main/"
 	//check necessary file
 	file := "config.json"
 	b, err := CheckExist(file)
@@ -301,11 +298,6 @@ func init() {
 		if err!=nil{
 			log.Println("failed to save config.json, please download it from the repo")
 		}
-		// err = DownloadFile(file, site+file)
-		// if err != nil {
-		// 	log.Println("Init stopped, please check you folder")
-		// 	os.Exit(1)
-		//}
 	}
 	//reading config file
 	fileContent, err := os.ReadFile("config.json")
@@ -313,7 +305,6 @@ func init() {
 		log.Fatalf("Error occoured when reading: %v", err)
 		os.Exit(1)
 	}
-
 	err = json.Unmarshal(fileContent, &webConfig)
 	if err != nil {
 		log.Fatalf("Error unamarshalling JSON: %v", err)
