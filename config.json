@@ -1,8 +1,8 @@
 {
-	"RCON_HOST":"0.0.0.0:25575",
-	"RCON_PASSWORD":"1234abcd",
-        "PORT":"8080",
-        "START_COMMAND":"java -Xmx6G -jar ./server.jar nogui",
-	"SERVER_POST":"$HOME/server/",
-	"SHOW_LOG":"true"
+    "rcon_host": "0.0.0.0:25575",
+    "rcon_password": "1234abcd",
+    "port": "8080",
+    "server_path": "$HOME/server/",
+    "show_log": "true",
+    "start_command": "java -Xmx6G -jar ./server.jar nogui"
 }

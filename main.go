@@ -18,12 +18,12 @@ import (
 )
 
 type Config struct {
-	RCON_HOST     string
-	RCON_PASSWORD string
-	PORT          string
-	SERVER_POST   string
-	SHOW_LOG      string
-	START_COMMAND string
+	RCON_HOST     string `json:"rcon_host"`
+	RCON_PASSWORD string `json:"rcon_password"`
+	PORT          string `json:"port"`
+	SERVER_PATH   string `json:"server_path"`    // 习惯上叫 path 或 dir
+	SHOW_LOG      string `json:"show_log"`
+	START_COMMAND string `json:"start_command"`
 }
 
 var (
@@ -116,7 +116,7 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 
 	// 启动 Minecraft 服务器进程
 	cmd := exec.Command("sh", "-c", webConfig.START_COMMAND)
-	cmd.Dir = os.ExpandEnv(webConfig.SERVER_POST)
+	cmd.Dir = os.ExpandEnv(webConfig.SERVER_PATH)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		log.Fatalf("failed to get out pipe:%v", err)
@@ -196,7 +196,7 @@ func handlenolog(w http.ResponseWriter, r *http.Request) {
 // the function to write the log to the web
 func handlelog(w http.ResponseWriter, r *http.Request) {
 
-	data, err := os.ReadFile(webConfig.SERVER_POST + "logs/latest.log")
+	data, err := os.ReadFile(webConfig.SERVER_PATH + "logs/latest.log")
 	if err != nil {
 		fmt.Println("filed to read", err)
 		http.Error(w, "unable to read", http.StatusInternalServerError)
@@ -263,9 +263,30 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func saveConfig(cfg Config) error {
+ 
+    // 第二个参数是前缀（通常为空），第三个参数是缩进（这里用4个空格）
+    data, err := json.MarshalIndent(cfg, "", "    ")
+    if err != nil {
+        return err
+    }
+
+    // 2. 将数据写入文件，0644 是标准的权限设置
+    return os.WriteFile("config.json", data, 0644)
+}
+
 func init() {
 	log.Println("Initializing...")
-	const site = "https://raw.githubusercontent.com/galoistom/web_for_server/main/"
+	//initialize webConfig
+	webConfig = Config{
+		RCON_HOST: "0.0.0.0:25575",
+		RCON_PASSWORD: "1234abcd",
+		PORT: "8080",
+		START_COMMAND: "java -Xmx6G -jar ./server.jar nogui",
+		SERVER_PATH: "$HOME/server/",
+		SHOW_LOG: "true",
+	}
+//	const site = "https://raw.githubusercontent.com/galoistom/web_for_server/main/"
 	//check necessary file
 	file := "config.json"
 	b, err := CheckExist(file)
@@ -276,11 +297,15 @@ func init() {
 	}
 	if !b {
 		log.Println("config.json does not exit, downloaing...")
-		err = DownloadFile(file, site+file)
-		if err != nil {
-			log.Println("Init stopped, please check you folder")
-			os.Exit(1)
+		err:= saveConfig(webConfig)
+		if err!=nil{
+			log.Println("failed to save config.json, please download it from the repo")
 		}
+		// err = DownloadFile(file, site+file)
+		// if err != nil {
+		// 	log.Println("Init stopped, please check you folder")
+		// 	os.Exit(1)
+		//}
 	}
 	//reading config file
 	fileContent, err := os.ReadFile("config.json")
