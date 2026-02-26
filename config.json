@@ -1,7 +1,8 @@
 {
 	"RCON_HOST":"0.0.0.0:25575",
 	"RCON_PASSWORD":"1234abcd",
-	"PORT":"8080",
-	"SERVER_POST":"/home/galoistom/server/",
+        "PORT":"8080",
+        "START_COMMAND":"java -Xmx6G -jar ./server.jar nogui",
+	"SERVER_POST":"$HOME/server/",
 	"SHOW_LOG":"true"
 }
