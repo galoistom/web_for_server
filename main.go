@@ -195,12 +195,6 @@ func handlenolog(w http.ResponseWriter, r *http.Request) {
 
 // the function to write the log to the web
 func handlelog(w http.ResponseWriter, r *http.Request) {
-	// data, err := os.ReadFile(webConfig.SERVER_PATH + "logs/latest.log")
-	// if err != nil {
-	// 	fmt.Println("filed to read", err)
-	// 	http.Error(w, "unable to read", http.StatusInternalServerError)
-	// 	return
-	// }
 	path := os.ExpandEnv(webConfig.SERVER_PATH)
 	cmd := exec.Command("tail", "-n", "50", "logs/latest.log")
 	cmd.Dir = path
@@ -217,7 +211,7 @@ func handlelog(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleCommand 处理来自网页端的命令请求
+// handleCommand to handle command from web
 func handleCommand(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -273,12 +267,11 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 }
 
 func saveConfig(cfg Config) error {
-	// 第二个参数是前缀（通常为空），第三个参数是缩进（这里用4个空格）
 	data, err := json.MarshalIndent(cfg, "", "    ")
 	if err != nil {
 		return err
 	}
-	// 2. 将数据写入文件，0644 是标准的权限设置
+
 	return os.WriteFile("config.json", data, 0644)
 }
 
@@ -302,23 +295,24 @@ func init() {
 		os.Exit(1)
 	}
 	if !b {
-		log.Println("config.json does not exit, downloaing...")
+		log.Println("config.json does not exit, creating...")
 		err := saveConfig(webConfig)
 		if err != nil {
 			log.Println("failed to save config.json, please download it from the repo")
 		}
-	}
-	//reading config file
-	fileContent, err := os.ReadFile(file)
-	if err != nil {
-		log.Fatalf("Error occoured when reading: %v", err)
-		os.Exit(1)
-	}
-	err = json.Unmarshal(fileContent, &webConfig)
-	if err != nil {
-		log.Fatalf("Error unamarshalling JSON: %v", err)
 	} else {
-		log.Println("Config loaded successfully")
+		//reading config file
+		fileContent, err := os.ReadFile(file)
+		if err != nil {
+			log.Fatalf("Error occoured when reading: %v", err)
+			os.Exit(1)
+		}
+		err = json.Unmarshal(fileContent, &webConfig)
+		if err != nil {
+			log.Fatalf("Error unamarshalling JSON: %v", err)
+		} else {
+			log.Println("Config loaded successfully")
+		}
 	}
 }
 
@@ -329,7 +323,6 @@ func main() {
 		panic(err)
 	}
 	http.Handle("/", http.FileServer(http.FS(dist)))
-	// 建议改为这样，确保外部可以访问
 	http.HandleFunc("/api/start", handleStart)
 	http.HandleFunc("/api/stop", handleStop)
 	http.HandleFunc("/api/checkstart", handlecheckStart)
