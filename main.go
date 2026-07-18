@@ -288,6 +288,21 @@ func init() {
 	}
 	//check necessary file
 	file := "config.json"
+	for i, arg := range os.Args {
+		if arg == "-c" || arg == "--config" {
+			if i+1 < len(os.Args) {
+				file = os.Args[i+1]
+				break
+			}
+		} else if arg == "-h" || arg == "--help" {
+			fmt.Println("usage: web_for_server -c <config.json>")
+		}
+	}
+	log.Printf("using config file: %s\n", file)
+	loadConfig(file)
+}
+
+func loadConfig(file string) {
 	b, err := CheckExist(file)
 	fmt.Println("checking " + file + " file")
 	if err != nil {
@@ -314,9 +329,18 @@ func init() {
 			log.Println("Config loaded successfully")
 		}
 	}
+
 }
 
 func main() {
+	log.Println("====================================")
+	log.Printf("rcon_host: %s\n", webConfig.RCON_HOST)
+	log.Printf("rcon_password: %s\n", webConfig.RCON_PASSWORD)
+	log.Printf("port: %s\n", webConfig.PORT)
+	log.Printf("server_path: %s\n", webConfig.SERVER_PATH)
+	log.Printf("start_command: %s\n", webConfig.START_COMMAND)
+	log.Printf("show_log: %s\n", webConfig.SHOW_LOG)
+	log.Println("====================================")
 	startCli()
 	dist, err := fs.Sub(indexDir, "static")
 	if err != nil {
