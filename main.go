@@ -21,7 +21,7 @@ type Config struct {
 	RCON_HOST     string `json:"rcon_host"`
 	RCON_PASSWORD string `json:"rcon_password"`
 	PORT          string `json:"port"`
-	SERVER_PATH   string `json:"server_path"` // 习惯上叫 path 或 dir
+	SERVER_PATH   string `json:"server_path"`
 	SHOW_LOG      string `json:"show_log"`
 	START_COMMAND string `json:"start_command"`
 }
@@ -32,8 +32,10 @@ var (
 	webConfig   Config
 	//go:embed static/*
 	indexDir embed.FS
+	DEBUG    bool
 )
 
+// to check whether the serer started
 func checkStarted() bool {
 	if mcServerCmd != nil {
 		return true
@@ -71,6 +73,14 @@ func startCli() {
 						resp.Body.Close()
 					}
 				}
+			case "help":
+				{
+					fmt.Println("\"start\" to start the minecraft server")
+					fmt.Println("\"stop\" to stop the minecraft server")
+					fmt.Println("\"exit\" to exit the program")
+					fmt.Println("\"help\" to get help for the program")
+					fmt.Println("all other cases are send directly to the minecraft server as command")
+				}
 			default:
 				{
 					if !checkStarted() {
@@ -92,6 +102,10 @@ func startCli() {
 				}
 			}
 		}
+		if err := scanner.Err(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading from stdin: %v\n", err)
+			os.Exit(1)
+		}
 	}()
 }
 
@@ -101,10 +115,8 @@ func handlecheckStart(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.Write([]byte("stopped"))
 	}
-	// fmt.Println("checked")
 }
 
-// handleStart 函数，处理启动服务器的请求
 func handleStart(w http.ResponseWriter, r *http.Request) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -114,14 +126,13 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 启动 Minecraft 服务器进程
 	cmd := exec.Command("sh", "-c", webConfig.START_COMMAND)
 	cmd.Dir = os.ExpandEnv(webConfig.SERVER_PATH)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		log.Fatalf("failed to get out pipe:%v", err)
 	}
-	// 启动进程
+
 	err = cmd.Start()
 	if err != nil {
 		fmt.Println("failed to start server precess: ", err)
@@ -129,7 +140,7 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Failed to start server process: %v", err), http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusOK) // 200
+	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Server started"))
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -275,10 +286,8 @@ func saveConfig(cfg Config) error {
 	return os.WriteFile("config.json", data, 0644)
 }
 
-func init() {
-	log.Println("Initializing...")
-	//initialize webConfig
-	webConfig = Config{
+func getDefaultConfig() Config {
+	return Config{
 		RCON_HOST:     "0.0.0.0:25575",
 		RCON_PASSWORD: "1234abcd",
 		PORT:          "8080",
@@ -286,7 +295,10 @@ func init() {
 		SERVER_PATH:   "$HOME/server/",
 		SHOW_LOG:      "true",
 	}
-	//check necessary file
+}
+
+func init() {
+	log.Println("Initializing...")
 	file := "config.json"
 	for i, arg := range os.Args {
 		if arg == "-c" || arg == "--config" {
@@ -294,8 +306,14 @@ func init() {
 				file = os.Args[i+1]
 				break
 			}
+		} else if arg == "-d" || arg == "--debug" {
+			DEBUG = true
 		} else if arg == "-h" || arg == "--help" {
-			fmt.Println("usage: web_for_server -c <config.json>")
+			fmt.Println("usage: web_for_server [option] ... <config.json>")
+			fmt.Println("        -c / --config for setting config")
+			fmt.Println("        -d / --debug  for start command line input")
+			fmt.Println("        -h / --help   for help")
+			os.Exit(0)
 		}
 	}
 	log.Printf("using config file: %s\n", file)
@@ -311,6 +329,7 @@ func loadConfig(file string) {
 	}
 	if !b {
 		log.Println("config.json does not exit, creating...")
+		webConfig = getDefaultConfig()
 		err := saveConfig(webConfig)
 		if err != nil {
 			log.Println("failed to save config.json, please download it from the repo")
@@ -340,8 +359,11 @@ func main() {
 	log.Printf("server_path: %s\n", webConfig.SERVER_PATH)
 	log.Printf("start_command: %s\n", webConfig.START_COMMAND)
 	log.Printf("show_log: %s\n", webConfig.SHOW_LOG)
+	log.Printf("mod: %t\n", DEBUG)
 	log.Println("====================================")
-	startCli()
+	if DEBUG {
+		startCli()
+	}
 	dist, err := fs.Sub(indexDir, "static")
 	if err != nil {
 		panic(err)
