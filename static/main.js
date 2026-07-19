@@ -1,149 +1,145 @@
-const logContainer = document.getElementById('log-container');
-const statusContainer = document.getElementById('status-container');
-let pollingInterval;
+const logContainer = document.getElementById('log-container')
+const statusContainer = document.getElementById('status-container')
+const commandInput = document.getElementById('command-input')
+const sendBtn = document.getElementById('send-btn')
+const themeToggle = document.getElementById('theme-toggle')
 
-// 启动服务器的函数
-async function startServer() {
-	try {
-		const response = await fetch('/api/start');
-	        const text = await response.text();
-	        if (response.ok) {
-		        // 成功的情况 (200 OK)
-		        logContainer.textContent = "✅ " + text;
-		        startPolling(); // 开始刷新日志
-		} else {
-		        // 失败的情况 (409, 500 等)
-		        logContainer.innerHTML = `<span style="color: #ff4444;">❌ ${text}</span>`;
-		}
-	        logContainer.textContent = text;
-	        // 启动服务器后，开始轮询日志
-	        startPolling();
-	} catch (error) {
-		logContainer.textContent = '无法启动服务器：' + error;
+let pollingInterval = null
+
+function setCommandEnabled(enabled) {
+	commandInput.disabled = !enabled
+	sendBtn.disabled = !enabled
+}
+
+function setPolling(shouldPoll) {
+	if (shouldPoll && !pollingInterval) {
+		pollingInterval = setInterval(refresh, 3000)
+	} else if (!shouldPoll && pollingInterval) {
+		clearInterval(pollingInterval)
+		pollingInterval = null
 	}
 }
 
-// 停止服务器的函数
-async function stopServer() {
-	stopPolling(); // 停止日志刷新
-	try {
-		const response = await fetch('/api/stop');
-		const text = await response.text();
-		logContainer.textContent = text;
-		refresh();
-	} catch (error) {
-		logContainer.textContent = '无法停止服务器：' + error;
-	}
+async function apiGet(path) {
+	const res = await fetch(path)
+	return { ok: res.ok, text: await res.text() }
 }
 
-// 停止轮询日志的函数
-function stopPolling() {
-	clearInterval(pollingInterval);
-	console.log("日志轮询已停止。");
-}
-
-// 开始轮询日志的函数
-function startPolling() {
-	if (pollingInterval) {
-		clearInterval(pollingInterval);
-	}
-	pollingInterval = setInterval(refresh, 5000);
-}
-
-// 获取日志并更新页面的函数
-async function refresh() {
-	try {
-		checkServerStatus();
-		//Decide based on the status
-		const response = await fetch('/api/checkstart');
-        const text = await response.text();
-
-		if (text.includes('running')) {
-			const logResponse = await fetch('/api/log');
-			const logText = await logResponse.text();
-
-			logContainer.textContent = logText;
-			logContainer.scrollTop = logContainer.scrollHeight;
-			if (!pollingInterval) {
-				startPolling();
-			}
-			return
-		}
-		
-		// Server is not running, show a message and exit
-		logContainer.textContent = "Server not running";
-	} catch (error) {
-		console.error("Failed to fetch logs or check status:", error);
-		logContainer.textContent = "An error occurred while trying to connect to the server.";
-	}
+async function apiPost(path, body) {
+	const res = await fetch(path, {
+		method: 'POST',
+		headers: { 'Content-Type': 'text/plain' },
+		body: body,
+	})
+	return { ok: res.ok, text: await res.text() }
 }
 
 async function checkServerStatus() {
 	try {
-		const response = await fetch('/api/checkstart');
-		const text = await response.text();
-	
-		if (text.includes('running')) {
-			statusContainer.textContent = 'running';
-			statusContainer.className = 'status-running';
-			if (!pollingInterval) {
-				startPolling();
-			}
-		} else {
-			statusContainer.textContent = 'stopped';
-			statusContainer.className = 'status-stopped';
-			stopPolling();
-			logContainer.textContent = "Server not running";
-		}
-	} catch (error) {
-		statusContainer.textContent = '状态: 错误';
-		statusContainer.className = 'status-stopped';
-		console.error("检查状态失败:", error);
-		stopPolling();
+		const { text } = await apiGet('/api/checkstart')
+		const running = text.includes('running')
+		statusContainer.textContent = running ? 'running' : 'stopped'
+		statusContainer.className = running ? 'status-running' : 'status-stopped'
+		setCommandEnabled(running)
+		return running
+	} catch {
+		statusContainer.textContent = 'error'
+		statusContainer.className = 'status-stopped'
+		setCommandEnabled(false)
+		return false
 	}
+}
+
+async function fetchLog() {
+	try {
+		const { text } = await apiGet('/api/log')
+		logContainer.textContent = text
+		requestAnimationFrame(() => {
+			logContainer.scrollTop = logContainer.scrollHeight
+		})
+	} catch {
+		logContainer.textContent = 'unable to fetch log'
+	}
+}
+
+async function refresh() {
+	const running = await checkServerStatus()
+	setPolling(running)
+	if (running) {
+		await fetchLog()
+	} else {
+		logContainer.innerHTML = '<div class="log-placeholder">server not running</div>'
+	}
+}
+
+async function startServer() {
+	try {
+		const { ok, text } = await apiGet('/api/start')
+		if (ok) {
+			statusContainer.textContent = 'running'
+			statusContainer.className = 'status-running'
+			setCommandEnabled(true)
+			setPolling(true)
+			await fetchLog()
+		} else {
+			logContainer.textContent = text
+		}
+	} catch (err) {
+	    logContainer.textContent = 'unable to start server: ' + err
+	}
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function stopServer() {
+    setPolling(false)
+    try {
+        const res = await apiGet('/api/stop')
+        logContainer.textContent = res.text
+    } catch (err) {
+        logContainer.textContent = '无法停止服务器：' + err
+    }
+    await sleep(1000)
+    await checkServerStatus()
 }
 
 async function sendCommand() {
-	const commandInput = document.getElementById('command-input');
-	const command = commandInput.value.trim(); // 使用 .trim() 移除前后空格
-
-	if (command === '') {
-		alert("请输入命令！");
-		return;
-	}
+	const command = commandInput.value.trim()
+	if (!command) return
 
 	try {
-		const response = await fetch('/api/command', {
-			method: 'POST',
-			// 告诉后端我们发送的是纯文本
-			headers: {
-				'Content-Type': 'text/plain'
-			},
-			// 直接发送纯文本字符串作为请求体
-			body: command
-		});
-
-		if (!response.ok) {
-			const errorText = await response.text();
-			throw new Error(`error: ${errorText}`);
-		}
-
-		const responseText = await response.text();
-		console.log('response:', responseText);
-
-		logContainer.textContent = responseText;
-		stopPolling();
-		commandInput.value = '';
-
-	} catch (error) {
-		console.error('failed to set:', error);
-		alert(`command failed to send: ${error.message}`);
+		const res = await apiPost('/api/command', command)
+		logContainer.textContent = res.ok ? res.text : '错误：' + res.text
+		commandInput.value = ''
+	} catch (err) {
+		logContainer.textContent = '命令发送失败：' + err
 	}
-
-	commandInput.value = '';
 }
 
-window.onload = function() {
-	checkServerStatus();
+commandInput.addEventListener('keydown', (e) => {
+	if (e.key === 'Enter') sendCommand()
+})
+
+// dark mode
+const saved = localStorage.getItem('theme')
+if (saved === 'dark') {
+	document.documentElement.setAttribute('data-theme', 'dark')
+	themeToggle.textContent = '☀️'
 }
- 
+
+themeToggle.addEventListener('click', () => {
+	const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+	if (isDark) {
+		document.documentElement.removeAttribute('data-theme')
+		localStorage.setItem('theme', 'light')
+		themeToggle.textContent = '🌙'
+	} else {
+		document.documentElement.setAttribute('data-theme', 'dark')
+		localStorage.setItem('theme', 'dark')
+		themeToggle.textContent = '☀️'
+	}
+})
+
+refresh()

@@ -208,18 +208,38 @@ func handlenolog(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func goTail(filename string, n int) ([]string, error) {
+    file, err := os.Open(filename)
+    if err != nil {
+        return nil, err
+    }
+    defer file.Close()
+    
+    var lines []string
+    scanner := bufio.NewScanner(file)
+    for scanner.Scan() {
+        lines = append(lines, scanner.Text())
+        if len(lines) > n {
+            lines = lines[1:]
+        }
+    }
+    return lines, nil
+}
+
 // the function to write the log to the web
 func handlelog(w http.ResponseWriter, r *http.Request) {
 	path := os.ExpandEnv(webConfig.SERVER_PATH)
-	cmd := exec.Command("tail", "-n", "50", "logs/latest.log")
-	cmd.Dir = path
-	data, err := cmd.Output()
+	// cmd := exec.Command("tail", "-n", "50", "logs/latest.log")
+	// cmd.Dir = path
+	// data, err := cmd.Output()
+	lines,err := goTail(path+"/logs/latest.log",50)
 
 	if err != nil {
 		log.Println("filed to read", webConfig.SERVER_PATH, err)
 		http.Error(w, "unable to read", http.StatusInternalServerError)
 		return
 	}
+	data := []byte(strings.Join(lines,"\n"))
 	_, err = w.Write(data)
 	
 	if err != nil {
@@ -258,6 +278,7 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 			} else {
 				resp.Body.Close()
 			}
+			return
 		}
 		w.Write([]byte("It is pointless to send commands when server is down >_< (type \"start\" to start the server)"))
 		return
