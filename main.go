@@ -53,12 +53,13 @@ func startCli() {
 			switch command {
 			case "exit":
 				{
-					fmt.Println("Exiting application...")
+					log.Println("Exiting application...")
 					if checkStarted() {
 						resp, err := http.Get("http://127.0.0.1:" + webConfig.PORT + "/api/stop")
 						if err != nil {
 							fmt.Println("unable to connect to server", err)
 						} else {
+							log.Println("server closed")
 							resp.Body.Close()
 						}
 					}
@@ -175,7 +176,7 @@ func handleStop(w http.ResponseWriter, r *http.Request) {
 	if !checkStarted() {
 		_, err := w.Write([]byte("The server can only be closed if it is already closed >_<"))
 		if err != nil {
-			fmt.Println("failed to write", err)
+			log.Println("failed to write", err)
 		}
 	}
 	conn, err := rcon.Dial(webConfig.RCON_HOST, webConfig.RCON_PASSWORD)
@@ -186,7 +187,6 @@ func handleStop(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	// 发送 "stop" 命令
 	response, err := conn.Execute("stop")
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to send command:%v", err), http.StatusInternalServerError)
@@ -207,18 +207,16 @@ func handlenolog(w http.ResponseWriter, r *http.Request) {
 // the function to write the log to the web
 func handlelog(w http.ResponseWriter, r *http.Request) {
 	path := os.ExpandEnv(webConfig.SERVER_PATH)
-	cmd := exec.Command("tail", "-n", "50", "logs/latest.log")
-	cmd.Dir = path
-	data, err := cmd.Output()
+	lines, err := tailFile(path+"/logs/latest.log",50)
 	if err != nil {
-		fmt.Println("filed to read", webConfig.SERVER_PATH, err)
+		log.Println("filed to read", webConfig.SERVER_PATH, err)
 		http.Error(w, "unable to read", http.StatusInternalServerError)
 		return
 	}
-
-	_, err = w.Write(data)
+	data := strings.Join(lines,"\n")
+	_, err = w.Write([]byte(data))
 	if err != nil {
-		fmt.Println("Failed to write", err)
+		log.Println("Failed to write", err)
 	}
 }
 
@@ -236,7 +234,6 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	// 从 URL 查询参数中获取 "command"
 	command := string(body)
 	if command == "" {
 		http.Error(w, "Command is empty", http.StatusBadRequest)
@@ -246,11 +243,11 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Received command from web: %s", command)
 
 	if !checkStarted() {
-		fmt.Println("the server is not started yet")
+		log.Println("the server is not started yet")
 		if command == "start" {
 			resp, err := http.Get("http://127.0.0.1:" + webConfig.PORT + "/api/start")
 			if err != nil {
-				fmt.Println("Error closing server", err)
+				log.Println("Error closing server", err)
 			} else {
 				resp.Body.Close()
 			}
@@ -261,7 +258,7 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := rcon.Dial(webConfig.RCON_HOST, webConfig.RCON_PASSWORD)
 	if err != nil {
-		fmt.Println("Unable to connect to server", err)
+		log.Printf("Unable to connect to server: %e", err)
 		return
 	}
 
@@ -269,9 +266,9 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := conn.Execute(command)
 	if err != nil {
-		fmt.Println("failed to send the order", err)
+		log.Printf("failed to send the order: %e", err)
 	} else {
-		fmt.Println(resp)
+		log.Println(resp)
 		w.Write([]byte(resp))
 	}
 
@@ -318,6 +315,40 @@ func init() {
 	}
 	log.Printf("using config file: %s\n", file)
 	loadConfig(file)
+}
+
+func CheckExist(name string) (bool, error) {
+	_, err := os.Stat(name)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		} else {
+			return false, fmt.Errorf("failed to get file status: %s", name)
+		}
+	}
+	return true, nil
+}
+
+func tailFile(filename string, lines int) ([]string, error) {
+    file, err := os.Open(filename)
+    if err != nil {
+        return nil, err
+    }
+    defer file.Close()
+
+    var allLines []string
+    scanner := bufio.NewScanner(file)
+    for scanner.Scan() {
+        allLines = append(allLines, scanner.Text())
+    }
+    if err := scanner.Err(); err != nil {
+        return nil, err
+    }
+
+    if len(allLines) <= lines {
+        return allLines, nil
+    }
+    return allLines[len(allLines)-lines:], nil
 }
 
 func loadConfig(file string) {
