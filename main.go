@@ -67,6 +67,10 @@ func startCli() {
 				} // 安全退出程序
 			case "start":
 				{
+					if checkStarted() {
+						log.Println("Server is already started...")
+						continue
+					}
 					resp, err := http.Get("http://127.0.0.1:" + webConfig.PORT + "/api/start")
 					if err != nil {
 						fmt.Println("Error start server", err)
@@ -207,14 +211,17 @@ func handlenolog(w http.ResponseWriter, r *http.Request) {
 // the function to write the log to the web
 func handlelog(w http.ResponseWriter, r *http.Request) {
 	path := os.ExpandEnv(webConfig.SERVER_PATH)
-	lines, err := tailFile(path+"/logs/latest.log",50)
+	cmd := exec.Command("tail", "-n", "50", "logs/latest.log")
+	cmd.Dir = path
+	data, err := cmd.Output()
+
 	if err != nil {
 		log.Println("filed to read", webConfig.SERVER_PATH, err)
 		http.Error(w, "unable to read", http.StatusInternalServerError)
 		return
 	}
-	data := strings.Join(lines,"\n")
-	_, err = w.Write([]byte(data))
+	_, err = w.Write(data)
+	
 	if err != nil {
 		log.Println("Failed to write", err)
 	}
@@ -327,28 +334,6 @@ func CheckExist(name string) (bool, error) {
 		}
 	}
 	return true, nil
-}
-
-func tailFile(filename string, lines int) ([]string, error) {
-    file, err := os.Open(filename)
-    if err != nil {
-        return nil, err
-    }
-    defer file.Close()
-
-    var allLines []string
-    scanner := bufio.NewScanner(file)
-    for scanner.Scan() {
-        allLines = append(allLines, scanner.Text())
-    }
-    if err := scanner.Err(); err != nil {
-        return nil, err
-    }
-
-    if len(allLines) <= lines {
-        return allLines, nil
-    }
-    return allLines[len(allLines)-lines:], nil
 }
 
 func loadConfig(file string) {
