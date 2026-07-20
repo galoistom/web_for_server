@@ -247,7 +247,7 @@ func handlelog(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleCommand to handle command from web
+// handleCommand to handle single command from web
 func handleCommand(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -299,7 +299,66 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 		log.Println(resp)
 		w.Write([]byte(resp))
 	}
+}
 
+// handleCommands handles multiple commands (newline-separated) in one request
+func handleCommands(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "failed to read body", http.StatusInternalServerError)
+		return
+	}
+	defer r.Body.Close()
+
+	raw := strings.TrimSpace(string(body))
+	if raw == "" {
+		http.Error(w, "Commands are empty", http.StatusBadRequest)
+		return
+	}
+
+	commands := strings.FieldsFunc(raw, func(c rune) bool { return c == '\n' })
+	if len(commands) == 0 {
+		http.Error(w, "No commands found", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Received %d commands from web", len(commands))
+
+	if !checkStarted() {
+		w.Write([]byte("It is pointless to send commands when server is down >_< (type \"start\" to start the server)"))
+		return
+	}
+
+	conn, err := rcon.Dial(webConfig.RCON_HOST, webConfig.RCON_PASSWORD)
+	if err != nil {
+		log.Printf("Unable to connect to server: %e", err)
+		http.Error(w, "RCON connection failed", http.StatusInternalServerError)
+		return
+	}
+	defer conn.Close()
+
+	var responses []string
+	for _, cmd := range commands {
+		cmd = strings.TrimSpace(cmd)
+		if cmd == "" {
+			continue
+		}
+		resp, err := conn.Execute(cmd)
+		if err != nil {
+			log.Printf("failed to send command %q: %e", cmd, err)
+			responses = append(responses, fmt.Sprintf("> %s\n[error] %v", cmd, err))
+		} else {
+			log.Printf("command %q executed", cmd)
+			responses = append(responses, fmt.Sprintf("> %s\n%s", cmd, resp))
+		}
+	}
+
+	w.Write([]byte(strings.Join(responses, "\n---\n")))
 }
 
 func saveConfig(cfg Config) error {
@@ -410,6 +469,7 @@ func main() {
 	http.HandleFunc("/api/stop", handleStop)
 	http.HandleFunc("/api/checkstart", handlecheckStart)
 	http.HandleFunc("/api/command", handleCommand)
+	http.HandleFunc("/api/commands", handleCommands)
 	if webConfig.SHOW_LOG == "true" {
 		http.HandleFunc("/api/log", handlelog)
 	} else {

@@ -201,6 +201,8 @@ main {
 	border: 1px solid var(--input-border);
 	border-radius: 8px;
 	outline: none;
+	resize: none;
+	font-family: inherit;
 	transition: border-color 0.2s, background 0.3s, color 0.3s;
 }
 

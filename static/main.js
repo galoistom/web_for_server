@@ -106,20 +106,29 @@ async function stopServer() {
 }
 
 async function sendCommand() {
-	const command = commandInput.value.trim()
+	const command = commandInput.value.replace(/\r/g, '').trim()
 	if (!command) return
 
 	try {
-		const res = await apiPost('/api/command', command)
+		const res = await apiPost('/api/commands', command)
 		logContainer.textContent = res.ok ? res.text : '错误：' + res.text
 		commandInput.value = ''
+		commandInput.rows = 1
 	} catch (err) {
 		logContainer.textContent = '命令发送失败：' + err
+		commandInput.rows = 1
 	}
 }
 
 commandInput.addEventListener('keydown', (e) => {
-	if (e.key === 'Enter') sendCommand()
+	if (e.key === 'Enter' && !e.shiftKey) {
+		e.preventDefault()
+		sendCommand()
+	}
+})
+
+commandInput.addEventListener('input', () => {
+	commandInput.rows = commandInput.value.split('\n').length
 })
 
 // dark mode
