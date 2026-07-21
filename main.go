@@ -52,10 +52,11 @@ var (
 	mu                 sync.Mutex
 	webConfig          Config
 	configFilePosition string
+	DEBUG              bool
+	editConfigFiles    *FileManager
+
 	//go:embed static/*
 	indexDir        embed.FS
-	DEBUG           bool
-	editConfigFiles *FileManager
 )
 
 // to check whether the serer started
@@ -66,6 +67,7 @@ func checkStarted() bool {
 	return false
 }
 
+// a simple implimentation to get the last n lines of the file
 func goTail(filename string, n int) ([]string, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -84,6 +86,7 @@ func goTail(filename string, n int) ([]string, error) {
 	return lines, nil
 }
 
+// create a new file from config
 func (f FileConfig) newFile() *File {
 	f.PATH = os.ExpandEnv(f.PATH)
 	return &File{
@@ -95,6 +98,7 @@ func (f FileConfig) newFile() *File {
 	}
 }
 
+// not useful yet perhaps i will improve the edit page in the future
 func getFileType(path string) string {
 	ext := filepath.Ext(path)
 	switch ext {
@@ -109,6 +113,7 @@ func getFileType(path string) string {
 	}
 }
 
+// read the content in the file
 func (f *File) ReadRaw() (string, error) {
 	data, err := os.ReadFile(f.Path)
 	if err != nil {
@@ -117,29 +122,34 @@ func (f *File) ReadRaw() (string, error) {
 	return string(data), nil
 }
 
+// write content to file
 func (f *File) SaveRaw(content string) error {
 	return os.WriteFile(f.Path, []byte(content), 0644)
 }
 
+// create new filemanager
 func NewFileManager() *FileManager {
 	return &FileManager{
 		handlers: make(map[string]File),
 	}
 }
 
+// add file to FileManager
 func (m *FileManager) RegisterHandler(id string, handler File) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.handlers[id] = handler
 }
 
-func (m *FileManager) GetHandler(id string) (File, bool) {
+// find file to edit
+func (m *FileManager) GetFile(id string) (File, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	h, ok := m.handlers[id]
 	return h, ok
 }
 
+// list files
 func (m *FileManager) ListFiles() []File {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -171,7 +181,7 @@ func startCli() {
 						}
 					}
 					os.Exit(0)
-				} // 安全退出程序
+				}
 			case "start":
 				{
 					if checkStarted() {
@@ -188,13 +198,13 @@ func startCli() {
 			case "reload":
 				{
 					loadConfig(configFilePosition)
-					// log.Println(configFilePosition)
 				}
 			case "help":
 				{
 					fmt.Println("\"start\" to start the minecraft server")
 					fmt.Println("\"stop\" to stop the minecraft server")
 					fmt.Println("\"exit\" to exit the program")
+					fmt.Println("\"reload\" to reload config")
 					fmt.Println("\"help\" to get help for the program")
 					fmt.Println("all other cases are send directly to the minecraft server as command")
 				}
@@ -226,6 +236,7 @@ func startCli() {
 	}()
 }
 
+// provide api to check whether server is started
 func handlecheckStart(w http.ResponseWriter, r *http.Request) {
 	if checkStarted() {
 		w.Write([]byte("running"))
@@ -234,6 +245,7 @@ func handlecheckStart(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// provide api to start server
 func handleStart(w http.ResponseWriter, r *http.Request) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -310,6 +322,7 @@ func handleStop(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "command 'stop' is sent\n with response \n%s", response)
 }
 
+// provide api to list files
 func (h *FileManager) handleList(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -322,6 +335,7 @@ func (h *FileManager) handleList(w http.ResponseWriter, r *http.Request) {
 
 }
 
+// provide api to read file
 func (h *FileManager) handleEdit(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -332,7 +346,7 @@ func (h *FileManager) handleEdit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missising file id", http.StatusBadRequest)
 		return
 	}
-	handler, ok := h.GetHandler(id)
+	handler, ok := h.GetFile(id)
 	if !ok {
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
@@ -355,6 +369,7 @@ func (h *FileManager) handleEdit(w http.ResponseWriter, r *http.Request) {
 
 }
 
+// provide api to modify file
 func (h *FileManager) handleSave(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -369,7 +384,7 @@ func (h *FileManager) handleSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler, ok := h.GetHandler(req.ID)
+	handler, ok := h.GetFile(req.ID)
 	if !ok {
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
@@ -541,6 +556,7 @@ func handleCommands(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(strings.Join(responses, "\n---\n")))
 }
 
+// to save default config to file
 func saveConfig(cfg Config) error {
 	data, err := json.MarshalIndent(cfg, "", "    ")
 	if err != nil {
@@ -550,6 +566,7 @@ func saveConfig(cfg Config) error {
 	return os.WriteFile("config.json", data, 0644)
 }
 
+// hard coded default config
 func getDefaultConfig() Config {
 	return Config{
 		RCON_HOST:     "0.0.0.0:25575",
@@ -592,6 +609,7 @@ func init() {
 	loadConfig(configFilePosition)
 }
 
+// check whether file exists
 func CheckExist(name string) (bool, error) {
 	_, err := os.Stat(name)
 	if err != nil {
@@ -604,6 +622,7 @@ func CheckExist(name string) (bool, error) {
 	return true, nil
 }
 
+// read and load config
 func loadConfig(file string) {
 	b, err := CheckExist(file)
 	fmt.Println("checking " + file + " file")
