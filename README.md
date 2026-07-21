@@ -31,6 +31,15 @@ start_command: the command to start your server, it will be executed in server_p
 
 show_log: whether you want to present the log file on the web, use ture or false.
 
+files: files that are allowed to preview and edit on the website, which should follow the format:
+```json
+{
+    "name":"file you want to show",
+    "path":"path to you file, better to be aboslute",
+    "private": true if you don't want people to edit it, otherwise false
+}
+```
+
 ## Commandline 
 
 ```bash
