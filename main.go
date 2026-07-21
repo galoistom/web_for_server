@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -18,21 +19,43 @@ import (
 )
 
 type Config struct {
-	RCON_HOST     string `json:"rcon_host"`
-	RCON_PASSWORD string `json:"rcon_password"`
-	PORT          string `json:"port"`
-	SERVER_PATH   string `json:"server_path"`
-	SHOW_LOG      string `json:"show_log"`
-	START_COMMAND string `json:"start_command"`
+	RCON_HOST     string       `json:"rcon_host"`
+	RCON_PASSWORD string       `json:"rcon_password"`
+	PORT          string       `json:"port"`
+	SERVER_PATH   string       `json:"server_path"`
+	SHOW_LOG      bool         `json:"show_log"`
+	START_COMMAND string       `json:"start_command"`
+	FILES         []FileConfig `json:"files"`
+}
+
+type FileConfig struct {
+	NAME    string `json:"name"`
+	PATH    string `json:"path"`
+	PREVIEW bool   `json:"preview"`
+}
+
+type File struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Path    string `json:"path"`
+	Type    string `json:"type"`
+	Preview bool   `json:"preview"`
+}
+
+type FileManager struct {
+	handlers map[string]File
+	mu       sync.RWMutex
 }
 
 var (
-	mcServerCmd *exec.Cmd  // 存储服务器进程的命令对象
-	mu          sync.Mutex // 保护共享变量的锁
-	webConfig   Config
+	mcServerCmd        *exec.Cmd
+	mu                 sync.Mutex
+	webConfig          Config
+	configFilePosition string
 	//go:embed static/*
-	indexDir embed.FS
-	DEBUG    bool
+	indexDir        embed.FS
+	DEBUG           bool
+	editConfigFiles *FileManager
 )
 
 // to check whether the serer started
@@ -41,6 +64,90 @@ func checkStarted() bool {
 		return true
 	}
 	return false
+}
+
+func goTail(filename string, n int) ([]string, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+		if len(lines) > n {
+			lines = lines[1:]
+		}
+	}
+	return lines, nil
+}
+
+func (f FileConfig) newFile() *File {
+	f.PATH = os.ExpandEnv(f.PATH)
+	return &File{
+		ID:      filepath.Base(f.PATH),
+		Name:    f.NAME,
+		Path:    f.PATH,
+		Type:    getFileType(f.PATH),
+		Preview: f.PREVIEW,
+	}
+}
+
+func getFileType(path string) string {
+	ext := filepath.Ext(path)
+	switch ext {
+	case ".json":
+		return "json"
+	case ".yaml", ".yml":
+		return "yaml"
+	case ".toml":
+		return "toml"
+	default:
+		return "text"
+	}
+}
+
+func (f *File) ReadRaw() (string, error) {
+	data, err := os.ReadFile(f.Path)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func (f *File) SaveRaw(content string) error {
+	return os.WriteFile(f.Path, []byte(content), 0644)
+}
+
+func NewFileManager() *FileManager {
+	return &FileManager{
+		handlers: make(map[string]File),
+	}
+}
+
+func (m *FileManager) RegisterHandler(id string, handler File) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.handlers[id] = handler
+}
+
+func (m *FileManager) GetHandler(id string) (File, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	h, ok := m.handlers[id]
+	return h, ok
+}
+
+func (m *FileManager) ListFiles() []File {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	result := make([]File, 0, len(m.handlers))
+	for _, h := range m.handlers {
+		result = append(result, h)
+	}
+	return result
 }
 
 // the function handleing the command from terminal(might not be used for a while)
@@ -77,6 +184,11 @@ func startCli() {
 					} else {
 						resp.Body.Close()
 					}
+				}
+			case "reload":
+				{
+					loadConfig(configFilePosition)
+					// log.Println(configFilePosition)
 				}
 			case "help":
 				{
@@ -140,8 +252,7 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 
 	err = cmd.Start()
 	if err != nil {
-		fmt.Println("failed to start server precess: ", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		log.Printf("failed to start server process: %v", err)
 		http.Error(w, fmt.Sprintf("Failed to start server process: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -178,10 +289,8 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 // the function to handle the shutdown of server
 func handleStop(w http.ResponseWriter, r *http.Request) {
 	if !checkStarted() {
-		_, err := w.Write([]byte("The server can only be closed if it is already closed >_<"))
-		if err != nil {
-			log.Println("failed to write", err)
-		}
+		w.Write([]byte("The server can only be closed if it is already closed >_<"))
+		return
 	}
 	conn, err := rcon.Dial(webConfig.RCON_HOST, webConfig.RCON_PASSWORD)
 	if err != nil {
@@ -201,49 +310,117 @@ func handleStop(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "command 'stop' is sent\n with response \n%s", response)
 }
 
-func handlenolog(w http.ResponseWriter, r *http.Request) {
-	_, err := w.Write([]byte("server is running now"))
-	if err != nil {
-		log.Fatalln("Failed to write", err)
+func (h *FileManager) handleList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
+	files := h.ListFiles()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(files)
+	log.Println("web checked list")
+
 }
 
-func goTail(filename string, n int) ([]string, error) {
-    file, err := os.Open(filename)
-    if err != nil {
-        return nil, err
-    }
-    defer file.Close()
-    
-    var lines []string
-    scanner := bufio.NewScanner(file)
-    for scanner.Scan() {
-        lines = append(lines, scanner.Text())
-        if len(lines) > n {
-            lines = lines[1:]
-        }
-    }
-    return lines, nil
+func (h *FileManager) handleEdit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "missising file id", http.StatusBadRequest)
+		return
+	}
+	handler, ok := h.GetHandler(id)
+	if !ok {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+	content, err := handler.ReadRaw()
+	if err != nil {
+		http.Error(w, "Failed to read file", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"id":      id,
+		"name":    handler.Name,
+		"content": content,
+		"type":    handler.Type,
+		"preview": handler.Preview,
+		"path":    handler.Path,
+	})
+	log.Printf("file %s viewed", handler.Path)
+
+}
+
+func (h *FileManager) handleSave(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		ID      string `json:"id"`
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	handler, ok := h.GetHandler(req.ID)
+	if !ok {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+
+	if handler.Preview {
+		http.Error(w, "File is preview-only", http.StatusForbidden)
+		return
+	}
+
+	if checkStarted() {
+		http.Error(w, "Cannot edit files while server is running", http.StatusConflict)
+		return
+	}
+
+	if err := handler.SaveRaw(req.Content); err != nil {
+		http.Error(w, "failed to save file", http.StatusInternalServerError)
+		log.Printf("unable to save %s: %s", handler.Path, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	if handler.Path == configFilePosition {
+		loadConfig(configFilePosition)
+		log.Println("config file edited and reloaded successfully")
+	}
+	log.Printf("file %s edited and saved", handler.Path)
 }
 
 // the function to write the log to the web
 func handlelog(w http.ResponseWriter, r *http.Request) {
-	path := os.ExpandEnv(webConfig.SERVER_PATH)
-	// cmd := exec.Command("tail", "-n", "50", "logs/latest.log")
-	// cmd.Dir = path
-	// data, err := cmd.Output()
-	lines,err := goTail(path+"/logs/latest.log",50)
+	if !webConfig.SHOW_LOG {
+		_, err := w.Write([]byte("server is running now"))
+		if err != nil {
+			log.Fatalln("Failed to write", err)
+		}
+	} else {
+		path := os.ExpandEnv(webConfig.SERVER_PATH)
+		lines, err := goTail(path+"/logs/latest.log", 50)
 
-	if err != nil {
-		log.Println("filed to read", webConfig.SERVER_PATH, err)
-		http.Error(w, "unable to read", http.StatusInternalServerError)
-		return
-	}
-	data := []byte(strings.Join(lines,"\n"))
-	_, err = w.Write(data)
-	
-	if err != nil {
-		log.Println("Failed to write", err)
+		if err != nil {
+			log.Println("filed to read", webConfig.SERVER_PATH, err)
+			http.Error(w, "unable to read", http.StatusInternalServerError)
+			return
+		}
+		data := []byte(strings.Join(lines, "\n"))
+		_, err = w.Write(data)
+
+		if err != nil {
+			log.Println("Failed to write", err)
+		}
 	}
 }
 
@@ -287,6 +464,7 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 	conn, err := rcon.Dial(webConfig.RCON_HOST, webConfig.RCON_PASSWORD)
 	if err != nil {
 		log.Printf("Unable to connect to server: %e", err)
+		http.Error(w, "RCON connection failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -295,10 +473,12 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 	resp, err := conn.Execute(command)
 	if err != nil {
 		log.Printf("failed to send the order: %e", err)
-	} else {
-		log.Println(resp)
-		w.Write([]byte(resp))
+		http.Error(w, fmt.Sprintf("Command failed: %v", err), http.StatusInternalServerError)
+		return
 	}
+
+	log.Println(resp)
+	w.Write([]byte(resp))
 }
 
 // handleCommands handles multiple commands (newline-separated) in one request
@@ -377,17 +557,25 @@ func getDefaultConfig() Config {
 		PORT:          "8080",
 		START_COMMAND: "java -Xmx6G -jar ./server.jar nogui",
 		SERVER_PATH:   "$HOME/server/",
-		SHOW_LOG:      "true",
+		SHOW_LOG:      true,
+		FILES: []FileConfig{
+			{
+				PATH:    "$HOME/server/server.properties",
+				NAME:    "server.properties",
+				PREVIEW: true,
+			},
+		},
 	}
 }
 
 func init() {
 	log.Println("Initializing...")
-	file := "config.json"
+	editConfigFiles = NewFileManager()
+	configFilePosition = "config.json"
 	for i, arg := range os.Args {
 		if arg == "-c" || arg == "--config" {
 			if i+1 < len(os.Args) {
-				file = os.Args[i+1]
+				configFilePosition = os.Args[i+1]
 				break
 			}
 		} else if arg == "-d" || arg == "--debug" {
@@ -400,8 +588,8 @@ func init() {
 			os.Exit(0)
 		}
 	}
-	log.Printf("using config file: %s\n", file)
-	loadConfig(file)
+	log.Printf("using config file: %s\n", configFilePosition)
+	loadConfig(configFilePosition)
 }
 
 func CheckExist(name string) (bool, error) {
@@ -431,32 +619,33 @@ func loadConfig(file string) {
 			log.Println("failed to save config.json, please download it from the repo")
 		}
 	} else {
-		//reading config file
 		fileContent, err := os.ReadFile(file)
 		if err != nil {
 			log.Fatalf("Error occoured when reading: %v", err)
 			os.Exit(1)
 		}
-		err = json.Unmarshal(fileContent, &webConfig)
-		if err != nil {
+		if err := json.Unmarshal(fileContent, &webConfig); err != nil {
 			log.Fatalf("Error unamarshalling JSON: %v", err)
-		} else {
-			log.Println("Config loaded successfully")
 		}
+		log.Println("Config loaded successfully")
+		log.Println("====================================")
+		log.Printf("rcon_host: %s\n", webConfig.RCON_HOST)
+		log.Printf("rcon_password: %s\n", webConfig.RCON_PASSWORD)
+		log.Printf("port: %s\n", webConfig.PORT)
+		log.Printf("server_path: %s\n", webConfig.SERVER_PATH)
+		log.Printf("start_command: %s\n", webConfig.START_COMMAND)
+		log.Printf("show_log: %t\n", webConfig.SHOW_LOG)
+		log.Printf("debug: %t\n", DEBUG)
+		log.Println("====================================")
 	}
-
+	for _, f := range webConfig.FILES {
+		editFile := f.newFile()
+		editConfigFiles.RegisterHandler(editFile.ID, *editFile)
+	}
+	log.Println("edit config files loaded successfully")
 }
 
 func main() {
-	log.Println("====================================")
-	log.Printf("rcon_host: %s\n", webConfig.RCON_HOST)
-	log.Printf("rcon_password: %s\n", webConfig.RCON_PASSWORD)
-	log.Printf("port: %s\n", webConfig.PORT)
-	log.Printf("server_path: %s\n", webConfig.SERVER_PATH)
-	log.Printf("start_command: %s\n", webConfig.START_COMMAND)
-	log.Printf("show_log: %s\n", webConfig.SHOW_LOG)
-	log.Printf("mod: %t\n", DEBUG)
-	log.Println("====================================")
 	if DEBUG {
 		startCli()
 	}
@@ -470,12 +659,10 @@ func main() {
 	http.HandleFunc("/api/checkstart", handlecheckStart)
 	http.HandleFunc("/api/command", handleCommand)
 	http.HandleFunc("/api/commands", handleCommands)
-	if webConfig.SHOW_LOG == "true" {
-		http.HandleFunc("/api/log", handlelog)
-	} else {
-		http.HandleFunc("/api/log", handlenolog)
-	}
-
+	http.HandleFunc("/api/file", editConfigFiles.handleList)
+	http.HandleFunc("/api/file/edit", editConfigFiles.handleEdit)
+	http.HandleFunc("/api/file/save", editConfigFiles.handleSave)
+	http.HandleFunc("/api/log", handlelog)
 	log.Println("Starting server on :" + webConfig.PORT)
 	log.Fatal(http.ListenAndServe(":"+webConfig.PORT, nil))
 }

@@ -3,6 +3,13 @@
     "rcon_password": "1234abcd",
     "port": "8080",
     "server_path": "$HOME/server/",
-    "show_log": "true",
-    "start_command": "java -Xmx6G -jar ./server.jar nogui"
+    "show_log": true,
+    "start_command": "java -Xmx6G -jar ./server.jar nogui",
+    "files": [
+        {
+            "name": "server.properties",
+            "path": "$HOME/server/server.properties",
+            "preview": true
+        }
+    ]
 }

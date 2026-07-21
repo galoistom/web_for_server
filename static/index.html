@@ -8,13 +8,32 @@
 	<link rel="icon" type="image/png" href="logo.png">
 </head>
 <body>
+	<div id="file-overlay" class="hidden"></div>
+
 	<header>
 		<h1>MC 服务器控制台</h1>
 		<div id="header-actions">
 			<div id="status-container">unknown</div>
+			<button id="file-toggle" title="文件管理">⚙️</button>
 			<button id="theme-toggle" title="切换主题">🌙</button>
 		</div>
 	</header>
+
+	<div id="file-panel" class="hidden">
+		<div id="file-panel-header">
+			<h2>文件管理</h2>
+			<button id="file-panel-close">✕</button>
+		</div>
+		<div id="file-list"></div>
+		<div id="file-editor" class="hidden">
+			<div id="file-editor-info"></div>
+			<textarea id="file-editor-content" spellcheck="false"></textarea>
+			<div id="file-editor-actions">
+				<button id="file-save-btn" class="btn btn-start">保存</button>
+				<span id="file-save-msg"></span>
+			</div>
+		</div>
+	</div>
 
 	<main>
 		<div id="button-container">
