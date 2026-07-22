@@ -1,0 +1,9 @@
+{{range .Files}}
+<a href="/edit?id={{.ID}}" class="file-list-item" data-id="{{.ID}}">
+	<span class="file-icon">{{if eq .Type "json"}}📋{{else}}📄{{end}}</span>
+	<span class="file-name">{{.Name}}</span>
+	{{if .Preview}}<span class="file-lock">👁️</span>{{end}}
+</a>
+{{else}}
+<div class="log-placeholder" style="padding:12px 20px;text-align:left">没有可编辑的文件</div>
+{{end}}

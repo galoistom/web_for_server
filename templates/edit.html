@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>编辑 {{.Name}} - MC Server Hub</title>
+	<link rel="stylesheet" href="/static/style.css">
+	<link rel="icon" type="image/png" href="/static/logo.png">
+	<script src="/static/htmx.min.js"></script>
+</head>
+<body>
+	<header>
+		<h1>📝 {{.Name}}</h1>
+		<div id="header-actions">
+			<a href="/" class="btn btn-refresh" style="text-decoration:none">← 返回</a>
+		</div>
+	</header>
+
+	<main style="max-width:100%;padding:16px 24px">
+		<p style="color:var(--text-secondary);margin-bottom:12px;font-size:0.9rem">
+			{{.Path}}
+			{{if .ReadOnly}} — <span class="error-msg">只读</span>{{end}}
+		</p>
+
+		<form hx-post="/api/file/save" hx-target="#save-status" hx-swap="innerHTML"
+			style="display:flex;flex-direction:column;height:calc(100vh - 140px)">
+			<input type="hidden" name="id" value="{{.ID}}">
+			<textarea name="content" spellcheck="false"
+				style="flex:1;width:100%;padding:14px;font-family:'Cascadia Code','Fira Code','Consolas',monospace;font-size:0.9rem;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);border-radius:8px;outline:none;resize:none;tab-size:2"
+				{{if .ReadOnly}}disabled{{end}}>{{.Content}}</textarea>
+			<div style="display:flex;align-items:center;gap:12px;margin-top:12px">
+				<button type="submit" class="btn btn-start" {{if .ReadOnly}}disabled{{end}}>保存</button>
+				<span id="save-status"></span>
+			</div>
+		</form>
+	</main>
+</body>
+</html>

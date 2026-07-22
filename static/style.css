@@ -84,10 +84,10 @@ header h1 {
 	color: #fff;
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
+	background: var(--text-secondary);
 }
-
-.status-running { background: var(--status-running); }
-.status-stopped { background: var(--status-stopped); }
+#status-container.status-running { background: var(--status-running); }
+#status-container.status-stopped { background: var(--status-stopped); }
 
 #theme-toggle {
 	background: var(--btn-refresh-bg);
@@ -346,6 +346,9 @@ main {
 	line-height: 1;
 }
 #file-toggle:hover { background: var(--btn-refresh-hover); }
+
+.error-msg { color: var(--status-stopped); font-weight: 500; }
+.success-msg { color: var(--status-running); font-weight: 500; }
 
 @media (max-width: 600px) {
 	header { padding: 10px 16px; }

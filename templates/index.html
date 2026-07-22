@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>MC Server Hub</title>
+	<link rel="stylesheet" href="/static/style.css">
+	<link rel="icon" type="image/png" href="/static/logo.png">
+	<script src="/static/htmx.min.js"></script>
+</head>
+<body>
+	<div id="file-overlay" class="hidden"
+		hx-on:click="closeFilePanel()"></div>
+
+	<header>
+		<h1>MC 服务器控制台</h1>
+		<div id="header-actions">
+			<div hx-get="/api/status" hx-trigger="load, every 3s" hx-swap="outerHTML">
+				<div id="status-container">unknown</div>
+			</div>
+			<button id="file-toggle" title="文件管理"
+				hx-get="/api/file"
+				hx-target="#file-list"
+				hx-swap="innerHTML"
+				hx-on::after-request="openFilePanel()">⚙️</button>
+			<button id="theme-toggle" title="切换主题">🌙</button>
+		</div>
+	</header>
+
+	<div id="file-panel" class="hidden">
+		<div id="file-panel-header">
+			<h2>文件管理</h2>
+			<button id="file-panel-close" hx-on:click="closeFilePanel()">✕</button>
+		</div>
+		<div id="file-list"></div>
+		<div id="file-editor" class="hidden"></div>
+	</div>
+
+	<main>
+		<div id="button-container">
+			<button hx-post="/api/start" hx-target="#log-container" hx-swap="innerHTML" class="btn btn-start">启动服务器</button>
+			<button hx-post="/api/stop" hx-target="#log-container" hx-swap="innerHTML" class="btn btn-stop">停止服务器</button>
+			<button hx-get="/api/log" hx-target="#log-container" hx-swap="innerHTML" class="btn btn-refresh">刷新</button>
+		</div>
+
+		<div id="log-container"
+			hx-get="/api/log"
+			hx-trigger="load, every 3s"
+			hx-swap="innerHTML">
+			<div class="log-placeholder">等待连接...</div>
+		</div>
+
+		<div id="command-container">
+			<textarea id="command-input" placeholder="输入 Minecraft 命令...（Enter 发送，Shift+Enter 换行）" rows="1"></textarea>
+			<button id="send-btn" class="btn btn-send">发送命令</button>
+		</div>
+	</main>
+
+	<script>
+		function openFilePanel() {
+			document.getElementById('file-panel').classList.remove('hidden')
+			document.getElementById('file-overlay').classList.remove('hidden')
+		}
+		function closeFilePanel() {
+			document.getElementById('file-panel').classList.add('hidden')
+			document.getElementById('file-overlay').classList.add('hidden')
+			htmx.trigger('#file-panel', 'panel-closed')
+		}
+		document.getElementById('file-overlay').addEventListener('click', closeFilePanel)
+		document.getElementById('file-panel-close').addEventListener('click', closeFilePanel)
+
+		document.getElementById('theme-toggle').addEventListener('click', function() {
+			const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+			document.documentElement.setAttribute('data-theme', isDark ? '' : 'dark')
+			localStorage.setItem('theme', isDark ? 'light' : 'dark')
+			this.textContent = isDark ? '🌙' : '☀️'
+		})
+		if (localStorage.getItem('theme') === 'dark') {
+			document.documentElement.setAttribute('data-theme', 'dark')
+			document.getElementById('theme-toggle').textContent = '☀️'
+		}
+
+		function sendCommand() {
+			const input = document.getElementById('command-input')
+			const cmd = input.value.replace(/\r/g, '').trim()
+			if (!cmd) return
+			htmx.ajax('POST', '/api/commands', {
+				target: '#log-container',
+				swap: 'innerHTML',
+				values: { command: cmd }
+			})
+			input.value = ''
+			input.rows = 1
+			document.getElementById('send-btn').disabled = true
+		}
+
+		document.getElementById('command-input').addEventListener('keydown', function(e) {
+			if (e.key === 'Enter' && !e.shiftKey) {
+				e.preventDefault()
+				sendCommand()
+			}
+		})
+		document.getElementById('command-input').addEventListener('input', function() {
+			this.rows = this.value.split('\n').length
+			document.getElementById('send-btn').disabled = !this.value.trim()
+		})
+		document.getElementById('send-btn').addEventListener('click', sendCommand)
+	</script>
+</body>
+</html>
