@@ -1,0 +1,57 @@
+#+title: Web For Server
+#+author: galoistom
+#+date: <2026-08-03 一>
+
+This is my first webpage *>_<*
+
+I run a minecraft server on my raspberrypi, and my friend want to restart server from time to time, but I do not want him to gain access to the hole machine, so I build this webpage. It is also a practice as I have been learning golang for a couple days. The frontend is using deepseekv4-flash with htmx (though I know few about the frontend *QWQ*)
+
+I only tested it on linux and macos, but I didn't acutally use any unix-based commands, so I'm pretty sure that it will work for windows as well.
+
+[[https://www.bilibili.com/video/BV1fD4y1m7TD][golang]]
+
+[[https://www.bilibili.com/video/BV1Xv411k7Xn][golang web]]
+
+These vedios are great and helps me a lot **orz**
+
+* Usage
+Simply Download the correct version for your os and chip, then it will automatically genreate the config file needed and save as config.json.
+
+Modify the configs to fit you needs and relaunch, it will load all of your settings.
+
+* Configs
+
+- tcp_host: the port you want to open tcp connection
+- rcon_host, password: the port of rcon that is connected to you minecraft server, which should meet your settings in server.porperties
+- port: the port you want the web to use
+- server_path: the position of your server, better be absolut position (though it will expand it automatically).
+- start_command: the command to start your server, it will be executed in server_path, so accept relative path and your own script
+- show_log: whether you want to present the log file on the web, use ture or false.
+- files: files that are allowed to preview and edit on the website, which should follow the format:
+#+begin_src json
+{
+    "name":"file you want to show",
+    "path":"path to you file, better to be aboslute",
+    "preview": true if you don't want people to edit it, otherwise false
+}
+#+end_src
+
+* Commandline 
+#+begin_src bash
+web_for_server [OPTIONS] <config.json>
+#+end_src
+where options including -c/--config for setting config file, -d/--debug for commandline control, and -h/--help for help
+
+once you enter the debug mode, you are able to send command directly to the minecraft server through commandline, except for "start" which is used to start the server, and "exit" is to exit the whole program.
+
+* TCP connection
+direct tcp connection is also supported, there is a password which you can modify in the code
+
+here are the commands that is avaliable:
+1. status, which will return you the status of server
+2. start, which will start there serve immediately
+3. stop, which whill stop the server
+4. connect, which connect you to the log pipeline (note: start command will automatically connect you to that pipe)
+5. disconnect, disconnect you from the pipeline resp.
+6. log <numbers>, the numbers of latest log you want to see
+7. command <commands>, to send command to the server
