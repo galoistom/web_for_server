@@ -1,4 +1,5 @@
 {
+    "tcp_host" : "0.0.0.0:6969",
     "rcon_host": "0.0.0.0:25575",
     "rcon_password": "1234abcd",
     "port": "8080",

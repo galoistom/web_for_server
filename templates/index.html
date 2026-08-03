@@ -41,6 +41,7 @@
 			<button hx-post="/api/start" hx-target="#log-container" hx-swap="innerHTML" class="btn btn-start">启动服务器</button>
 			<button hx-post="/api/stop" hx-target="#log-container" hx-swap="innerHTML" class="btn btn-stop">停止服务器</button>
 			<button hx-get="/api/log" hx-target="#log-container" hx-swap="innerHTML" class="btn btn-refresh">刷新</button>
+			<a href="/download/log" class="btn btn-refresh" download>下载日志</a>
 		</div>
 
 		<div id="log-container"

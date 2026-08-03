@@ -1,0 +1,57 @@
+
+config.go,118
+package main1,0
+func saveConfig(10,63
+func getDefaultConfig(18,238
+func CheckExist(36,665
+func loadConfig(48,905
+
+handlers.go,535
+package main1,0
+type StatusData 16,149
+type LogData 21,205
+type ListData 25,253
+type EditData 29,293
+func htmlerr(37,402
+func htmlerrf(41,539
+func htmlok(45,640
+func renderTemplate(49,758
+func handleIndex(59,1085
+func handleEditPage(67,1243
+func handleStatus(93,1909
+func handleStart(102,2206
+func handleStop(110,2452
+func handleLog(124,2921
+func handleCommand(146,3630
+func handleCommands(173,4385
+func handleDownloadLog(221,5838
+func (h *FileManager) handleList(229,6178
+func (h *FileManager) handleSave(234,6342
+
+main.go,259
+package main1,0
+type Config 21,182
+func checkStarted(50,954
+func readerOutput(54,1011
+func startServer(71,1333
+func Commands(106,2145
+func startCli(133,2857
+func tcpConnect(195,4580
+func handleConnect(214,4978
+func init(328,8310
+func main(363,9466
+
+utiles.go,387
+package main1,0
+type FileConfig 10,66
+type File 16,187
+type FileManager 24,360
+func goTail(29,438
+func (f FileConfig) newFile(51,845
+func getFileType(62,1061
+func (f *File) ReadRaw(76,1274
+func (f *File) SaveRaw(84,1417
+func NewFileManager(88,1519
+func (m *FileManager) RegisterHandler(94,1619
+func (m *FileManager) GetFile(100,1747
+func (m *FileManager) ListFiles(107,1881
