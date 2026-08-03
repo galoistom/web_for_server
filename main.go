@@ -29,11 +29,23 @@ type Config struct {
 	FILES         []FileConfig `json:"files"`
 }
 
+type boardCaster struct {
+	subscribers map[string]chan string
+	mu          sync.RWMutex
+}
+
+func newBoardCaster() *boardCaster {
+	return &boardCaster{
+		subscribers: make(map[string]chan string),
+	}
+}
+
 var (
-	mcServerCmd        *exec.Cmd
-	latestLog          io.ReadCloser
-	mu                 sync.Mutex
-	webConfig          Config
+	mcServerCmd *exec.Cmd
+	board       *boardCaster
+	mu          sync.Mutex
+	webConfig   Config
+
 	configFilePosition string
 	DEBUG              bool
 	editConfigFiles    *FileManager
@@ -51,23 +63,6 @@ func checkStarted() bool {
 	return mcServerCmd != nil
 }
 
-func readerOutput(stdout io.ReadCloser, output func(string), stop <-chan bool) error {
-	defer stdout.Close()
-	scanner := bufio.NewScanner(stdout)
-	for scanner.Scan() {
-		select {
-		case <-stop:
-			return nil
-		default:
-			output(scanner.Text())
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-	return nil
-}
-
 func startServer() (string, error) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -79,16 +74,18 @@ func startServer() (string, error) {
 	cmd := exec.Command("sh", "-c", webConfig.START_COMMAND)
 	cmd.Dir = os.ExpandEnv(webConfig.SERVER_PATH)
 
-	var err error
-	latestLog, err = cmd.StdoutPipe()
+	reader, err := cmd.StdoutPipe()
 	if err != nil {
 		log.Fatalf("failed to get out pipe:%v", err)
 	}
-	err = cmd.Start()
-	if err != nil {
+
+	if err := cmd.Start(); err != nil {
 		log.Printf("failed to start server process: %v", err)
+		reader.Close()
 		return "", fmt.Errorf("failed to start: %v", err)
 	}
+
+	go board.read(reader)
 
 	go func(cmd *exec.Cmd) {
 		log.Printf("Minecraft server process (PID: %d) has started...", cmd.Process.Pid)
@@ -96,7 +93,6 @@ func startServer() (string, error) {
 		log.Println("Minecraft server process has stopped.")
 		mu.Lock()
 		mcServerCmd = nil
-		latestLog = nil
 		mu.Unlock()
 	}(cmd)
 	mcServerCmd = cmd
@@ -128,13 +124,70 @@ func Commands(command string) (string, error) {
 	return resp, nil
 }
 
+func (b *boardCaster) read(r io.ReadCloser) error {
+	defer func() {
+		r.Close()
+		b.clearSubscribers()
+	}()
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		text := scanner.Text()
+		b.mu.RLock()
+		for name, ch := range b.subscribers {
+			select {
+			case ch <- text:
+			default:
+				log.Printf("dropping log line for slow subscriber %s", name)
+			}
+		}
+		b.mu.RUnlock()
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (b *boardCaster) addSubscriber(name string, out func(string)) {
+	ch := make(chan string, 100)
+	b.mu.Lock()
+	if old, ok := b.subscribers[name]; ok {
+		delete(b.subscribers, name)
+		close(old)
+	}
+	b.subscribers[name] = ch
+	b.mu.Unlock()
+	go func() {
+		for line := range ch {
+			out(line)
+		}
+	}()
+}
+
+func (b *boardCaster) deleteSubscriber(name string) {
+	b.mu.Lock()
+	if ch, ok := b.subscribers[name]; ok {
+		delete(b.subscribers, name)
+		close(ch)
+	}
+	b.mu.Unlock()
+}
+
+func (b *boardCaster) clearSubscribers() {
+	b.mu.Lock()
+	for name, ch := range b.subscribers {
+		delete(b.subscribers, name)
+		close(ch)
+	}
+	b.mu.Unlock()
+}
+
 // --- CLI ---
 
 func startCli() {
 	go func() {
 		fmt.Println("Type 'exit' to quit the application.")
 		scanner := bufio.NewScanner(os.Stdin)
-		stop := make(chan bool)
 		for scanner.Scan() {
 			command := strings.TrimSpace(scanner.Text())
 			switch command {
@@ -156,12 +209,10 @@ func startCli() {
 					continue
 				}
 				result, err := startServer()
-				go readerOutput(latestLog, func(a string) {
-					fmt.Printf("%s\n", a)
-				}, stop)
 				if err != nil {
 					log.Fatalf("failed to start: %v", err)
 				}
+				board.addSubscriber("stdin", func(text string) { fmt.Println(text) })
 				log.Println(result)
 			case "reload":
 				loadConfig(configFilePosition)
@@ -212,12 +263,15 @@ func tcpConnect() {
 }
 
 func handleConnect(c net.Conn) {
+	name := c.RemoteAddr().String()
 	defer c.Close()
+	defer board.deleteSubscriber(name)
 	fmt.Fprint(c, "Password:")
 	buf := make([]byte, 1024)
 	n, err := c.Read(buf)
 	if err != nil {
 		log.Printf("failed to read: %v", err)
+		return
 	}
 	if strings.TrimSpace(string(buf[:n])) != tcpPassword {
 		fmt.Fprintln(c, "password incorrect")
@@ -225,19 +279,19 @@ func handleConnect(c net.Conn) {
 	}
 	fmt.Fprintln(c, "welcome!")
 	connected := false
-	stop := make(chan bool)
-	for true {
+	for {
 		buf := make([]byte, 1024)
 		n, err := c.Read(buf)
 		if err != nil {
-			log.Printf("failed to read: %v", err)
+			log.Printf("failed to read from %s: %v", name, err)
+			break
 		}
 		if strings.TrimSpace(string(buf[:n])) == "exit" || n == 0 {
-			log.Printf("tcp connection %s stopped\n", c.RemoteAddr())
+			log.Printf("tcp connection %s stopped\n", name)
 			break
 		}
 		message := strings.TrimRight(string(buf[:n]), "\r\n")
-		log.Printf("received from %s : %s", c.RemoteAddr(), message)
+		log.Printf("received from %s : %s", name, message)
 		switch {
 		case message == "status":
 			if checkStarted() {
@@ -251,12 +305,11 @@ func handleConnect(c net.Conn) {
 				continue
 			}
 			result, err := startServer()
-			go readerOutput(latestLog, func(a string) {
-				fmt.Fprintf(c, "%s\n", a)
-			}, stop)
 			if err != nil {
 				fmt.Fprintf(c, "failed to start: %v\n", err)
+				continue
 			}
+			board.addSubscriber(name, func(text string) { fmt.Fprintln(c, text) })
 			connected = true
 			fmt.Fprintln(c, result)
 		case message == "connect":
@@ -265,15 +318,16 @@ func handleConnect(c net.Conn) {
 			} else if connected {
 				fmt.Fprintln(c, "already connected")
 			} else {
-				go readerOutput(latestLog, func(a string) {
-					fmt.Fprintf(c, "%s\n", a)
-				}, stop)
+				board.addSubscriber(name, func(text string) { fmt.Fprintln(c, text) })
+				connected = true
 			}
 		case message == "disconnect":
 			if !connected {
 				fmt.Fprintln(c, "not connected yet")
 			} else {
-				stop <- true
+				board.deleteSubscriber(name)
+				connected = false
+				log.Printf("%s pipe disconnected", name)
 			}
 		case message == "reload":
 			loadConfig(configFilePosition)
@@ -327,6 +381,7 @@ func handleConnect(c net.Conn) {
 
 func init() {
 	log.Println("Initializing...")
+	board = newBoardCaster()
 	editConfigFiles = NewFileManager()
 	configFilePosition = "config.json"
 	for i, arg := range os.Args {
