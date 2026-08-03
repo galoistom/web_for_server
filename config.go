@@ -18,6 +18,7 @@ func saveConfig(cfg Config) error {
 func getDefaultConfig() Config {
 	return Config{
 		TCP_HOST:      "0.0.0.0:6969",
+		TCP_PASSWORD:  "1234abcd",
 		RCON_HOST:     "0.0.0.0:25575",
 		RCON_PASSWORD: "1234abcd",
 		PORT:          "8080",

@@ -22,6 +22,7 @@ Modify the configs to fit you needs and relaunch, it will load all of your setti
 * Configs
 
 - *tcp_host*: the port you want to open tcp connection
+- *tcp_password*: the password for tcp connection
 - *rcon_host, password*: the port of rcon that is connected to you minecraft server, which should meet your settings in server.porperties
 - *port*: the port you want the web to use
 - *server_path*: the position of your server, better be absolut position (though it will expand it automatically).
@@ -38,7 +39,7 @@ Modify the configs to fit you needs and relaunch, it will load all of your setti
 
 * Commandline 
 #+begin_src bash
-web_for_server [OPTIONS] <config.json>
+web_for_server [OPTIONS] </path/to/config.json>
 #+end_src
 where options including -c/--config for setting config file, -d/--debug for commandline control, and -h/--help for help
 
@@ -51,7 +52,9 @@ here are the commands that is avaliable:
 1. *status*, which will return you the status of server
 2. *start*, which will start there serve immediately
 3. *stop*, which whill stop the server
-4. *connect*, which connect you to the log pipeline (note: start command will automatically connect you to that pipe)
+3. *help*, to get help
+3. *reload*, will reload the config
+4. *connect*, to connect you to the log pipeline (note: start command will automatically connect you to that pipe)
 5. *disconnect*, disconnect you from the pipeline resp.
 6. *log <numbers>*, the numbers of latest log you want to see
 7. *command <commands>*, to send command to the server

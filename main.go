@@ -20,6 +20,7 @@ import (
 
 type Config struct {
 	TCP_HOST      string       `json:"tcp_host"`
+	TCP_PASSWORD  string       `json:"tcp_password"`
 	RCON_HOST     string       `json:"rcon_host"`
 	RCON_PASSWORD string       `json:"rcon_password"`
 	PORT          string       `json:"port"`
@@ -49,7 +50,6 @@ var (
 	configFilePosition string
 	DEBUG              bool
 	editConfigFiles    *FileManager
-	tcpPassword        string = "1234abcd"
 
 	//go:embed static/*
 	staticFS embed.FS
@@ -125,10 +125,8 @@ func Commands(command string) (string, error) {
 }
 
 func (b *boardCaster) read(r io.ReadCloser) error {
-	defer func() {
-		r.Close()
-		b.clearSubscribers()
-	}()
+	defer r.Close()
+	defer b.clearSubscribers()
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		text := scanner.Text()
@@ -273,7 +271,7 @@ func handleConnect(c net.Conn) {
 		log.Printf("failed to read: %v", err)
 		return
 	}
-	if strings.TrimSpace(string(buf[:n])) != tcpPassword {
+	if strings.TrimSpace(string(buf[:n])) != webConfig.TCP_PASSWORD {
 		fmt.Fprintln(c, "password incorrect")
 		return
 	}
@@ -327,11 +325,11 @@ func handleConnect(c net.Conn) {
 			} else {
 				board.deleteSubscriber(name)
 				connected = false
-				log.Printf("%s pipe disconnected", name)
+				log.Printf("%s pipe disconnected\n", name)
 			}
 		case message == "reload":
 			loadConfig(configFilePosition)
-			fmt.Fprintf(c, "config reloaded: %+v", webConfig)
+			fmt.Fprintf(c, "config reloaded: %+v\n", webConfig)
 		case message == "help":
 			fmt.Fprintln(c, "\"help\"                to get help for the program")
 			fmt.Fprintln(c, "\"exit\"                to exit the connection")
